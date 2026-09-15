@@ -181,9 +181,10 @@ def _generation_error(e: Exception) -> tuple[int, str]:
         return 400, str(e)
     # Google Gemini (the user's own key)
     if "API_KEY_INVALID" in text or "API key not valid" in text or "API key expired" in text:
-        return 400, "Google rejected your Gemini API key. Check it in the Configure panel."
+        return 400, f"Google rejected your Gemini API key: {_provider_message(text)}"
     if "PERMISSION_DENIED" in text:
-        return 400, "Your Google API key isn't allowed to use the Gemini API. Create a key in Google AI Studio."
+        # Can mean the API is disabled, the key is restricted (IP/website/API), or no access to this model
+        return 403, f"Google denied access (PERMISSION_DENIED): {_provider_message(text)}"
     if "RESOURCE_EXHAUSTED" in text or ("429" in text and "quota" in text.lower()):
         if "PerDay" in text:
             return 429, "Your Gemini API key has used its daily free quota. It resets tomorrow, or enable billing in Google AI Studio."
