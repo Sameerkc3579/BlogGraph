@@ -2,3 +2,10 @@
 __pycache__/
 *.pyc
 images/
+.env.*
+!.env.example
+venv/
+.venv/
+*.db
+*.db-journal
+image_errors.log

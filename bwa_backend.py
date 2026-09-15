@@ -1,35 +1,37 @@
-#pyrefly:ignore[missing-import]
 from __future__ import annotations
 
-#pyrefly:ignore[missing-import]
+import io
+import json
 import operator
-#pyrefly:ignore[missing-import]
 import os
-#pyrefly:ignore[missing-import]
+import logging
 import re
-#pyrefly:ignore[missing-import]
+import secrets
 from datetime import date, timedelta
-#pyrefly:ignore[missing-import]
 from pathlib import Path
-#pyrefly:ignore[missing-import]
 from typing import TypedDict, List, Optional, Literal, Annotated
 
-#pyrefly:ignore[missing-import]
+from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
-#pyrefly:ignore[missing-import]
 from langgraph.graph import StateGraph, START, END
-#pyrefly:ignore[missing-import]
 from langgraph.types import Send
 
-#pyrefly:ignore[missing-import]
-from langchain_google_genai import ChatGoogleGenerativeAI
-#pyrefly:ignore[missing-import]
-from langchain_core.messages import SystemMessage, HumanMessage
-#pyrefly:ignore[missing-import]
-from dotenv import load_dotenv
+from langchain_core.messages import AIMessage, SystemMessage, HumanMessage
+from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
+
+import database
 
 load_dotenv()
+
+BASE_DIR = Path(__file__).parent
+OUTPUT_DIR = BASE_DIR
+# SAVE_MARKDOWN_FILES=1 also writes each finished blog as a .md file next to this script (local use)
+SAVE_MARKDOWN_FILES = os.environ.get("SAVE_MARKDOWN_FILES", "0") == "1"
+# ENABLE_IMAGES=0 skips image generation entirely (images use far more Hugging Face credits than text)
+ENABLE_IMAGES = os.environ.get("ENABLE_IMAGES", "1") != "0"
+
+log = logging.getLogger("bloggraph.agent")
 
 # ============================================================
 # Blog Writer (Router → (Research?) → Orchestrator → Workers → ReducerWithImages)
@@ -83,20 +85,20 @@ class EvidencePack(BaseModel):
     evidence: List[EvidenceItem] = Field(default_factory=list)
 
 
-# ---- Image planning schema (ported from your image flow) ----
+# ---- Image planning schema ----
 class ImageSpec(BaseModel):
-    placeholder: str = Field(..., description="e.g. [[IMAGE_1]]")
+    insert_after_heading: str = Field(
+        ..., description='Exact text of the "## " section heading the image goes after, without the "## ".'
+    )
     filename: str = Field(..., description="Save under images/, e.g. qkv_flow.png")
     alt: str
     caption: str
     prompt: str = Field(..., description="Prompt to send to the image model.")
-    size: Literal["1024x1024", "1024x1536", "1536x1024"] = "1024x1024"
-    quality: Literal["low", "medium", "high"] = "medium"
 
 
 class GlobalImagePlan(BaseModel):
-    md_with_placeholders: str
     images: List[ImageSpec] = Field(default_factory=list)
+
 
 class State(TypedDict):
     topic: str
@@ -126,7 +128,56 @@ class State(TypedDict):
 # -----------------------------
 # 2) LLM
 # -----------------------------
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
+hf_token = os.environ.get("HUGGINGFACEHUB_API_TOKEN") or os.environ.get("HF_TOKEN", "")
+
+hf_llm = HuggingFaceEndpoint(
+    repo_id="Qwen/Qwen2.5-72B-Instruct",
+    huggingfacehub_api_token=hf_token,
+    max_new_tokens=2048,
+    timeout=120,
+)
+llm = ChatHuggingFace(llm=hf_llm)
+
+IMAGE_MODEL = os.environ.get("HF_IMAGE_MODEL", "black-forest-labs/FLUX.1-schnell")
+
+
+def _extract_json(text: str) -> str:
+    """Pulls the JSON object out of a model reply (handles ```json fences and surrounding prose)."""
+    fenced = re.search(r"```(?:json)?\s*(\{.*\})\s*```", text, flags=re.S)
+    if fenced:
+        return fenced.group(1)
+    start, end = text.find("{"), text.rfind("}")
+    if start == -1 or end <= start:
+        raise ValueError("No JSON object found in model output.")
+    return text[start:end + 1]
+
+
+def structured_invoke(schema: type[BaseModel], messages: list, retries: int = 1):
+    """Structured output via prompting + Pydantic validation.
+
+    ChatHuggingFace.with_structured_output() rejects Pydantic schemas for function calling,
+    so the schema is sent in the prompt and the reply is parsed and validated here instead.
+    """
+    instructions = (
+        "\n\nRespond with ONLY a single JSON object (no prose, no markdown fences) "
+        "that validates against this JSON Schema:\n"
+        f"{json.dumps(schema.model_json_schema())}"
+    )
+    msgs = list(messages)
+    msgs[0] = SystemMessage(content=msgs[0].content + instructions)
+
+    last_error: Exception | None = None
+    for _ in range(retries + 1):
+        reply = llm.invoke(msgs).content
+        try:
+            return schema.model_validate_json(_extract_json(reply))
+        except Exception as e:
+            last_error = e
+            msgs = msgs + [
+                AIMessage(content=reply),
+                HumanMessage(content=f"That output was invalid ({e}). Return ONLY the corrected JSON object."),
+            ]
+    raise ValueError(f"Model did not return valid {schema.__name__} JSON: {last_error}")
 
 # -----------------------------
 # 3) Router
@@ -146,13 +197,17 @@ If needs_research=true:
 """
 
 def router_node(state: State) -> dict:
-    decider = llm.with_structured_output(RouterDecision)
-    decision = decider.invoke(
-        [
-            SystemMessage(content=ROUTER_SYSTEM),
-            HumanMessage(content=f"Topic: {state['topic']}\nAs-of date: {state['as_of']}"),
-        ]
-    )
+    try:
+        decision = structured_invoke(
+            RouterDecision,
+            [
+                SystemMessage(content=ROUTER_SYSTEM),
+                HumanMessage(content=f"Topic: {state['topic']}\nAs-of date: {state['as_of']}"),
+            ]
+        )
+    except Exception:
+        # If the router's structured output fails, fall back to writing without research
+        decision = RouterDecision(needs_research=False, mode="closed_book", reason="router fallback")
 
     if decision.mode == "open_book":
         recency_days = 7
@@ -162,7 +217,7 @@ def router_node(state: State) -> dict:
         recency_days = 3650
 
     return {
-        "needs_research": decision.needs_research,
+        "needs_research": decision.needs_research and bool(decision.queries),
         "mode": decision.mode,
         "queries": decision.queries,
         "recency_days": recency_days,
@@ -172,11 +227,10 @@ def route_next(state: State) -> str:
     return "research" if state["needs_research"] else "orchestrator"
 
 # -----------------------------
-# 4) Research (Tavily)
+# 4) Research (DuckDuckGo)
 # -----------------------------
-def _tavily_search(query: str, max_results: int = 5) -> List[dict]:
+def _web_search(query: str, max_results: int = 5) -> List[dict]:
     try:
-        #pyrefly:ignore[missing-import]
         from langchain_community.utilities import DuckDuckGoSearchAPIWrapper
         wrapper = DuckDuckGoSearchAPIWrapper(max_results=max_results)
         results = wrapper.results(query, max_results)
@@ -187,8 +241,8 @@ def _tavily_search(query: str, max_results: int = 5) -> List[dict]:
                     "title": r.get("title") or "",
                     "url": r.get("link") or "",
                     "snippet": r.get("snippet") or "",
-                    "published_at": None,
-                    "source": "DuckDuckGo",
+                    "published_at": r.get("date"),
+                    "source": r.get("source") or "DuckDuckGo",
                 }
             )
         return out
@@ -219,35 +273,41 @@ def research_node(state: State) -> dict:
     queries = (state.get("queries") or [])[:10]
     raw: List[dict] = []
     for q in queries:
-        raw.extend(_tavily_search(q, max_results=6))
+        raw.extend(_web_search(q, max_results=6))
 
     if not raw:
         return {"evidence": []}
 
-    extractor = llm.with_structured_output(EvidencePack)
-    pack = extractor.invoke(
-        [
-            SystemMessage(content=RESEARCH_SYSTEM),
-            HumanMessage(
-                content=(
-                    f"As-of date: {state['as_of']}\n"
-                    f"Recency days: {state['recency_days']}\n\n"
-                    f"Raw results:\n{raw}"
-                )
-            ),
-        ]
-    )
+    try:
+        pack = structured_invoke(
+            EvidencePack,
+            [
+                SystemMessage(content=RESEARCH_SYSTEM),
+                HumanMessage(
+                    content=(
+                        f"As-of date: {state['as_of']}\n"
+                        f"Recency days: {state['recency_days']}\n\n"
+                        f"Raw results:\n{raw[:40]}"
+                    )
+                ),
+            ]
+        )
+        evidence = pack.evidence
+    except Exception:
+        # Fall back to the raw search results if synthesis fails
+        evidence = [EvidenceItem(**r) for r in raw if r["url"]]
 
     dedup = {}
-    for e in pack.evidence:
+    for e in evidence:
         if e.url:
             dedup[e.url] = e
     evidence = list(dedup.values())
 
     if state.get("mode") == "open_book":
-        as_of = date.fromisoformat(state["as_of"])
+        as_of = _iso_to_date(state["as_of"]) or date.today()
         cutoff = as_of - timedelta(days=int(state["recency_days"]))
-        evidence = [e for e in evidence if (d := _iso_to_date(e.published_at)) and d >= cutoff]
+        # Drop only items known to be stale; search results often have no date at all
+        evidence = [e for e in evidence if (d := _iso_to_date(e.published_at)) is None or d >= cutoff]
 
     return {"evidence": evidence}
 
@@ -273,13 +333,13 @@ Output must match Plan schema.
 """
 
 def orchestrator_node(state: State) -> dict:
-    planner = llm.with_structured_output(Plan)
     mode = state.get("mode", "closed_book")
     evidence = state.get("evidence", [])
 
     forced_kind = "news_roundup" if mode == "open_book" else None
 
-    plan = planner.invoke(
+    plan = structured_invoke(
+        Plan,
         [
             SystemMessage(content=ORCH_SYSTEM),
             HumanMessage(
@@ -288,13 +348,19 @@ def orchestrator_node(state: State) -> dict:
                     f"Mode: {mode}\n"
                     f"As-of: {state['as_of']} (recency_days={state['recency_days']})\n"
                     f"{'Force blog_kind=news_roundup' if forced_kind else ''}\n\n"
-                    f"Evidence:\n{[e.model_dump() for e in evidence][:16]}"
+                    f"Evidence:\n{[e.model_dump() for e in evidence[:16]]}"
                 )
             ),
         ]
     )
+    if not plan.tasks:
+        raise ValueError("Planner returned no sections.")
     if forced_kind:
         plan.blog_kind = "news_roundup"
+
+    # Make task ids unique and ordered so sections merge in plan order
+    for i, task in enumerate(plan.tasks, start=1):
+        task.id = i
 
     return {"plan": plan}
 
@@ -354,7 +420,7 @@ def worker_node(payload: dict) -> dict:
     evidence_text = "\n".join(
         f"- {e.title} | {e.url} | {e.published_at or 'date:unknown'}"
         for e in evidence[:20]
-    )
+    ) or "(none)"
 
     section_md = llm.invoke(
         [
@@ -383,6 +449,10 @@ def worker_node(payload: dict) -> dict:
         ]
     ).content.strip()
 
+    # Guarantee each section starts with its heading so image placement can find it
+    if not section_md.startswith("#"):
+        section_md = f"## {task.title}\n\n{section_md}"
+
     return {"sections": [(task.id, section_md)]}
 
 # ============================================================
@@ -405,86 +475,58 @@ Decide if images/diagrams are needed for THIS blog.
 Rules:
 - Max 3 images total.
 - Each image must materially improve understanding (diagram/flow/table-like visual).
-- Insert placeholders exactly: [[IMAGE_1]], [[IMAGE_2]], [[IMAGE_3]].
-- If no images needed: md_with_placeholders must equal input and images=[].
+- For each image, set insert_after_heading to the exact text of one "## " heading from the blog.
+- If no images are needed, return images=[].
 - Avoid decorative images; prefer technical diagrams with short labels.
 Return strictly GlobalImagePlan.
 """
 
 def decide_images(state: State) -> dict:
-    planner = llm.with_structured_output(GlobalImagePlan)
     merged_md = state["merged_md"]
     plan = state["plan"]
     assert plan is not None
 
-    image_plan = planner.invoke(
-        [
-            SystemMessage(content=DECIDE_IMAGES_SYSTEM),
-            HumanMessage(
-                content=(
-                    f"Blog kind: {plan.blog_kind}\n"
-                    f"Topic: {state['topic']}\n\n"
-                    "Insert placeholders + propose image prompts.\n\n"
-                    f"{merged_md}"
-                )
-            ),
-        ]
-    )
+    if not ENABLE_IMAGES:
+        return {"md_with_placeholders": merged_md, "image_specs": []}
 
-    return {
-        "md_with_placeholders": image_plan.md_with_placeholders,
-        "image_specs": [img.model_dump() for img in image_plan.images],
-    }
+    # Only the headings and a short excerpt are sent, so the model never has to echo the whole blog
+    headings = re.findall(r"^##\s+(.+?)\s*$", merged_md, flags=re.M)
+    if not headings:
+        return {"md_with_placeholders": merged_md, "image_specs": []}
 
+    try:
+        image_plan = structured_invoke(
+            GlobalImagePlan,
+            [
+                SystemMessage(content=DECIDE_IMAGES_SYSTEM),
+                HumanMessage(
+                    content=(
+                        f"Blog kind: {plan.blog_kind}\n"
+                        f"Topic: {state['topic']}\n\n"
+                        "Section headings:\n" + "\n".join(f"- {h}" for h in headings) + "\n\n"
+                        f"Blog excerpt:\n{merged_md[:4000]}"
+                    )
+                ),
+            ]
+        )
+        specs = image_plan.images[:3]
+    except Exception:
+        specs = []
 
-def _gemini_generate_image_bytes(prompt: str) -> bytes:
-    """
-    Returns raw image bytes generated by Gemini.
-    Requires: pip install google-genai
-    Env var: GOOGLE_API_KEY
-    """
-    #pyrefly:ignore[missing-import]
-    from google import genai
-    #pyrefly:ignore[missing-import]
-    from google.genai import types
+    md = merged_md
+    image_specs: List[dict] = []
+    for i, spec in enumerate(specs, start=1):
+        placeholder = f"[[IMAGE_{i}]]"
+        heading = spec.insert_after_heading.strip().lstrip("#").strip()
+        # Place the image at the end of the chosen section (before the next heading)
+        pattern = re.compile(rf"(^##\s+{re.escape(heading)}\s*$.*?)(?=^##\s|\Z)", flags=re.M | re.S)
+        md, n = pattern.subn(lambda m: m.group(1).rstrip() + f"\n\n{placeholder}\n\n", md, count=1)
+        if n:
+            data = spec.model_dump()
+            data["placeholder"] = placeholder
+            image_specs.append(data)
 
-    api_key = os.environ.get("GOOGLE_API_KEY")
-    if not api_key:
-        raise RuntimeError("GOOGLE_API_KEY is not set.")
-
-    client = genai.Client(api_key=api_key)
-
-    resp = client.models.generate_content(
-        model="gemini-2.5-flash-image",
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_modalities=["IMAGE"],
-            safety_settings=[
-                types.SafetySetting(
-                    category="HARM_CATEGORY_DANGEROUS_CONTENT",
-                    threshold="BLOCK_ONLY_HIGH",
-                )
-            ],
-        ),
-    )
-
-    # Depending on SDK version, parts may hang off resp.candidates[0].content.parts
-    parts = getattr(resp, "parts", None)
-    if not parts and getattr(resp, "candidates", None):
-        try:
-            parts = resp.candidates[0].content.parts
-        except Exception:
-            parts = None
-
-    if not parts:
-        raise RuntimeError("No image content returned (safety/quota/SDK change).")
-
-    for part in parts:
-        inline = getattr(part, "inline_data", None)
-        if inline and getattr(inline, "data", None):
-            return inline.data
-
-    raise RuntimeError("No inline image bytes found in response.")
+    return {"md_with_placeholders": md, "image_specs": image_specs}
 
 
 def _safe_slug(title: str) -> str:
@@ -494,6 +536,23 @@ def _safe_slug(title: str) -> str:
     return s or "blog"
 
 
+def _unique_image_filename(name: str) -> str:
+    """Random suffix so blogs never share or overwrite each other's images (and URLs are unguessable)."""
+    stem = _safe_slug(Path(name).stem)[:60]
+    return f"{stem}-{secrets.token_hex(8)}.jpg"
+
+
+def _huggingface_generate_image_bytes(prompt: str) -> bytes:
+    from huggingface_hub import InferenceClient
+
+    client = InferenceClient(token=hf_token or None, timeout=120)
+    image = client.text_to_image(prompt, model=IMAGE_MODEL)
+    buf = io.BytesIO()
+    # JPEG is ~5-10x smaller than PNG, which matters since images are stored in the database
+    image.convert("RGB").save(buf, format="JPEG", quality=85, optimize=True)
+    return buf.getvalue()
+
+
 def generate_and_place_images(state: State) -> dict:
     plan = state["plan"]
     assert plan is not None
@@ -501,41 +560,26 @@ def generate_and_place_images(state: State) -> dict:
     md = state.get("md_with_placeholders") or state["merged_md"]
     image_specs = state.get("image_specs", []) or []
 
-    # If no images requested, just write merged markdown
-    if not image_specs:
-        filename = f"{_safe_slug(plan.blog_title)}.md"
-        Path(filename).write_text(md, encoding="utf-8")
-        return {"final": md}
-
-    images_dir = Path("images")
-    images_dir.mkdir(exist_ok=True)
-
     for spec in image_specs:
         placeholder = spec["placeholder"]
-        filename = spec["filename"]
-        out_path = images_dir / filename
+        filename = _unique_image_filename(spec["filename"])
+        try:
+            # Stored in the database (not on disk) so images survive redeploys
+            database.save_image(filename, _huggingface_generate_image_bytes(spec["prompt"]), "image/jpeg")
+        except Exception:
+            # Leave the image out rather than showing a broken placeholder
+            log.exception("Image generation failed for %s", filename)
+            md = md.replace(placeholder + "\n\n", "").replace(placeholder, "")
+            continue
 
-        # generate only if needed
-        if not out_path.exists():
-            try:
-                img_bytes = _gemini_generate_image_bytes(spec["prompt"])
-                out_path.write_bytes(img_bytes)
-            except Exception as e:
-                # graceful fallback: keep doc usable
-                prompt_block = (
-                    f"> **[IMAGE GENERATION FAILED]** {spec.get('caption','')}\n>\n"
-                    f"> **Alt:** {spec.get('alt','')}\n>\n"
-                    f"> **Prompt:** {spec.get('prompt','')}\n>\n"
-                    f"> **Error:** {e}\n"
-                )
-                md = md.replace(placeholder, prompt_block)
-                continue
-
-        img_md = f"![{spec['alt']}](images/{filename})\n*{spec['caption']}*"
+        img_md = f"![{spec['alt']}](/images/{filename})\n*{spec['caption']}*"
         md = md.replace(placeholder, img_md)
 
-    filename = f"{_safe_slug(plan.blog_title)}.md"
-    Path(filename).write_text(md, encoding="utf-8")
+    # Remove any placeholders that were not filled
+    md = re.sub(r"\[\[IMAGE_\d+\]\]\n*", "", md)
+
+    if SAVE_MARKDOWN_FILES:
+        (OUTPUT_DIR / f"{_safe_slug(plan.blog_title)}.md").write_text(md, encoding="utf-8")
     return {"final": md}
 
 # build reducer subgraph
@@ -568,5 +612,3 @@ g.add_edge("worker", "reducer")
 g.add_edge("reducer", END)
 
 app = g.compile()
-app
-

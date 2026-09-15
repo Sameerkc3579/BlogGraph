@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BlogGraph — The all-in-one AI workspace for writers</title>
+  <meta name="description" content="BlogGraph combines the tools you need to run your entire writing process — capture projects, notes, drafts, and more in collaborative workspaces powered by AI." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css?v=3" />
+</head>
+<body>
+
+  <!-- ══════════════════════════════════════════════════
+       PAGE: LANDING  (#home)
+  ══════════════════════════════════════════════════ -->
+  <div id="page-landing" class="page page-landing">
+
+    <header class="landing-nav">
+      <div class="landing-nav-inner">
+        <a class="landing-brand" href="#home" data-nav="home">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+            <rect width="22" height="22" rx="5" fill="#1a1a1a"/>
+            <path d="M6 16 L11 6 L16 16" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M8.5 12.5 H13.5" stroke="white" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+          <span class="landing-brand-name">BLOGGRAPH</span>
+        </a>
+        <nav class="landing-nav-links">
+          <a href="#login"  class="nav-btn-ghost"   data-nav="login">Log In</a>
+          <a href="#signup" class="nav-btn-outline"  data-nav="signup">Sign Up</a>
+        </nav>
+      </div>
+    </header>
+
+    <!-- HERO -->
+    <section class="landing-hero">
+      <div class="hero-float hero-float-left" aria-hidden="true">
+        <div class="float-card float-card-doc">
+          <div class="float-doc-lines">
+            <div class="float-line w-80"></div>
+            <div class="float-line w-60"></div>
+            <div class="float-line w-90"></div>
+            <div class="float-line w-50"></div>
+            <div class="float-line w-70"></div>
+            <div class="float-line w-40"></div>
+          </div>
+          <div class="float-cursor" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 3l14 9-7 2-2 7-5-18z" fill="#555" stroke="#555" stroke-width="0.5"/></svg>
+          </div>
+          <button class="float-create-btn">Create</button>
+        </div>
+        <div class="float-card float-card-s2">
+          <div class="float-line w-90" style="height:8px;background:#ddd;margin-bottom:8px;border-radius:4px;"></div>
+          <div class="float-line w-70" style="height:8px;background:#eee;border-radius:4px;"></div>
+          <span class="float-nav-arrow">›</span>
+        </div>
+      </div>
+
+      <div class="hero-text-center">
+        <h1 class="hero-headline">The all-in-one<br>AI workspace for writers</h1>
+        <p class="hero-subtext">
+          BlogGraph combines the tools you need to run your entire
+          writing process — capture projects, notes, drafts, and
+          more in collaborative workspaces powered by AI.
+        </p>
+        <a href="#signup" class="hero-cta-btn" data-nav="signup">Get Started →</a>
+      </div>
+
+      <div class="hero-float hero-float-right" aria-hidden="true">
+        <div class="float-card float-chat-hint">
+          <p class="float-chat-hint-text">Use <span class="float-chip">@Project Ideas</span> to fill out <span class="float-chip float-chip-gray">@Temp</span></p>
+        </div>
+        <div class="float-card float-status-card">
+          <p class="float-status-title">Change status</p>
+          <ul class="float-status-list">
+            <li><span class="status-dot status-idea"></span> Idea</li>
+            <li><span class="status-dot status-research"></span> Research</li>
+            <li><span class="status-dot status-outline"></span> Outline</li>
+            <li><span class="status-dot status-draft"></span> Draft</li>
+            <li><span class="status-dot status-review"></span> Review</li>
+            <li><span class="status-dot status-done"></span> Done</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- FEATURE STRIP -->
+    <section class="features-strip">
+      <div class="features-strip-inner">
+        <div class="feature-item">
+          <span class="feature-icon">✦</span>
+          <div>
+            <p class="feature-name">AI-Powered Research</p>
+            <p class="feature-desc">Automatically finds the best sources and evidence for your topic.</p>
+          </div>
+        </div>
+        <div class="feature-divider"></div>
+        <div class="feature-item">
+          <span class="feature-icon">📋</span>
+          <div>
+            <p class="feature-name">Structured Outlines</p>
+            <p class="feature-desc">Generates a full blog plan before writing a single word.</p>
+          </div>
+        </div>
+        <div class="feature-divider"></div>
+        <div class="feature-item">
+          <span class="feature-icon">🖊</span>
+          <div>
+            <p class="feature-name">Complete Drafts</p>
+            <p class="feature-desc">Writes every section in full, with citations and images.</p>
+          </div>
+        </div>
+        <div class="feature-divider"></div>
+        <div class="feature-item">
+          <span class="feature-icon">⚡</span>
+          <div>
+            <p class="feature-name">LangGraph Agent</p>
+            <p class="feature-desc">Multi-step agentic workflow powered by Qwen + LangGraph.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DEMO WINDOW -->
+    <section class="demo-section">
+      <div class="demo-window">
+        <div class="demo-titlebar">
+          <div class="demo-dots">
+            <span class="demo-dot demo-dot-red"></span>
+            <span class="demo-dot demo-dot-yellow"></span>
+            <span class="demo-dot demo-dot-green"></span>
+          </div>
+          <div class="demo-toolbar-center">
+            <span class="demo-workspace-title">Marketing</span>
+            <div class="demo-toolbar-actions">
+              <button class="demo-toolbar-btn">Share</button>
+              <button class="demo-toolbar-btn demo-btn-brand">🔊 Brand Voice</button>
+              <button class="demo-toolbar-btn demo-btn-icon">≡</button>
+              <button class="demo-toolbar-btn demo-btn-icon">⊞</button>
+              <button class="demo-toolbar-btn demo-btn-icon">…</button>
+              <button class="demo-toolbar-btn demo-btn-icon">+ ∨</button>
+            </div>
+          </div>
+          <div class="demo-toolbar-right">
+            <button class="demo-icon-btn">⤢</button>
+            <button class="demo-icon-btn">□</button>
+          </div>
+        </div>
+        <div class="demo-body">
+          <aside class="demo-sidebar">
+            <div class="demo-sidebar-top">
+              <button class="demo-sidebar-item">☰</button>
+              <button class="demo-sidebar-item demo-sidebar-item-brand">B</button>
+            </div>
+            <nav class="demo-sidebar-nav">
+              <a href="#" class="demo-nav-item">🏠 Home</a>
+              <a href="#" class="demo-nav-item">🔖 Brand</a>
+            </nav>
+            <div class="demo-sidebar-section-label">Workspaces</div>
+            <nav class="demo-sidebar-nav">
+              <a href="#" class="demo-nav-item demo-nav-small">📄 Welcome to BlogG...</a>
+              <a href="#" class="demo-nav-item demo-nav-small demo-nav-active">📁 Marketing</a>
+              <a href="#" class="demo-nav-item demo-nav-small">📄 Social</a>
+              <a href="#" class="demo-nav-item demo-nav-small demo-nav-add">+ Add a workspace</a>
+            </nav>
+          </aside>
+
+          <div class="demo-board">
+            <div class="demo-column">
+              <div class="demo-col-header">
+                <span class="demo-col-icon">✦</span>
+                <span class="demo-col-name">Ideas</span>
+                <span class="demo-col-count">5</span>
+                <div class="demo-col-actions"><button>+</button><button>…</button></div>
+              </div>
+              <div class="demo-card">
+                <h4 class="demo-card-title">Why Brand Storytelling is Essential in Today's Digital Age</h4>
+                <p class="demo-card-text">It allows brands to differentiate themselves in a crowded digital marketplace and foster customer loyalty.</p>
+                <p class="demo-card-text">Storytelling provides a unique, authentic voice that resonates with consumers, creating a strong emotional connection.</p>
+                <div class="demo-card-tag">✦ Storytelling</div>
+              </div>
+              <div class="demo-card">
+                <h4 class="demo-card-title">Demystifying SEO: Tips for Ranking Higher in 2024</h4>
+                <p class="demo-card-text">Effective SEO strategies can significantly improve a website's visibility and ranking on search engine results pages.</p>
+                <div class="demo-card-tag">✦ SEO</div>
+              </div>
+              <div class="demo-card">
+                <h4 class="demo-card-title">The Future of Marketing: Top Trends to Watch in 2024</h4>
+                <p class="demo-card-text">AI will revolutionize marketing strategies with predictive analytics and customer segmentation.</p>
+                <div class="demo-card-tag">✦ Trends</div>
+              </div>
+            </div>
+
+            <div class="demo-column">
+              <div class="demo-col-header">
+                <span class="demo-col-icon demo-col-icon-research">○</span>
+                <span class="demo-col-name">Research</span>
+                <span class="demo-col-count">3</span>
+                <div class="demo-col-actions"><button>+</button><button>…</button></div>
+              </div>
+              <div class="demo-card demo-card-featured">
+                <h4 class="demo-card-title">Harnessing the Power of Data: How to Create Data-Driven Marketing Campaigns</h4>
+                <p class="demo-card-text">• Data-driven marketing campaigns are becoming essential for businesses seeking to understand and engage their target audience.</p>
+                <p class="demo-card-text">• Harnessing the power of data allows marketers to create personalized, targeted campaigns that yield higher returns.</p>
+                <div class="demo-card-tag demo-card-tag-outline">○ Data</div>
+                <div class="demo-cursor-indicator" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 3l14 9-7 2-2 7-5-18z" fill="#888" stroke="#888" stroke-width="0.5"/></svg>
+                </div>
+              </div>
+              <div class="demo-card">
+                <h4 class="demo-card-title">From Browsers to Buyers: Optimizing Your Website for Conversion</h4>
+                <p class="demo-card-text">• Optimizing your website for conversion is crucial in turning casual browsers into committed buyers.</p>
+                <div class="demo-card-tag demo-card-tag-outline">○ Conversion</div>
+              </div>
+            </div>
+
+            <div class="demo-column demo-column-outline">
+              <div class="demo-col-header">
+                <span class="demo-col-icon demo-col-icon-outline">◎</span>
+                <span class="demo-col-name">Outline</span>
+                <span class="demo-col-count">1</span>
+                <div class="demo-col-actions"><button>+</button><button>…</button></div>
+              </div>
+            </div>
+          </div>
+
+          <aside class="demo-chat-panel">
+            <div class="demo-chat-header">
+              <span class="demo-chat-dot"></span>
+              <span class="demo-chat-workspace-name">BlogGraph</span>
+            </div>
+            <div class="demo-chat-messages">
+              <div class="demo-chat-msg">
+                <p class="demo-chat-greeting">Hi there!</p>
+                <p class="demo-chat-text">You can use the left workspace to start creating and organizing your work. Anything you create, we can chat about here.</p>
+                <p class="demo-chat-text">Or, if you want to start brainstorming ideas, you can use our optimized workflows by clicking the yellow magic button on the left (or use the CMD+K shortcut).</p>
+              </div>
+            </div>
+            <div class="demo-chat-input-row">
+              <input class="demo-chat-input" type="text" placeholder="Send a message about Marketing" readonly />
+              <button class="demo-chat-send-btn">↑</button>
+            </div>
+          </aside>
+        </div>
+        <div class="demo-magic-bar">
+          <button class="demo-magic-btn">✦</button>
+          <div class="demo-magic-shortcut"><span>⌘</span><span>K</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BOTTOM CTA -->
+    <section class="landing-cta-section">
+      <div class="landing-cta-inner">
+        <h2 class="landing-cta-title">Ready to write brilliantly?</h2>
+        <p class="landing-cta-sub">Join thousands of writers using AI to create better content, faster.</p>
+        <a href="#signup" class="hero-cta-btn" data-nav="signup">Start Writing for Free →</a>
+      </div>
+    </section>
+
+    <footer class="landing-footer">
+      <div class="landing-footer-inner">
+        <div class="landing-brand">
+          <svg width="18" height="18" viewBox="0 0 22 22" fill="none"><rect width="22" height="22" rx="5" fill="#1a1a1a"/><path d="M6 16 L11 6 L16 16" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.5 12.5 H13.5" stroke="white" stroke-width="1.4" stroke-linecap="round"/></svg>
+          <span class="landing-brand-name" style="font-size:11px;">BLOGGRAPH</span>
+        </div>
+        <p class="landing-footer-copy">Built with LangGraph · Qwen · DuckDuckGo · FastAPI</p>
+        <p class="landing-footer-copy">© 2025 BlogGraph. All rights reserved.</p>
+      </div>
+    </footer>
+  </div><!-- /page-landing -->
+
+
+  <!-- ══════════════════════════════════════════════════
+       PAGE: LOGIN  (#login)
+  ══════════════════════════════════════════════════ -->
+  <div id="page-login" class="page page-auth" hidden>
+    <div class="auth-layout">
+
+      <!-- Left panel: brand + illustration -->
+      <div class="auth-left">
+        <a class="auth-brand" href="#home" data-nav="home">
+          <svg width="26" height="26" viewBox="0 0 22 22" fill="none">
+            <rect width="22" height="22" rx="5" fill="white"/>
+            <path d="M6 16 L11 6 L16 16" stroke="#1a1a1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M8.5 12.5 H13.5" stroke="#1a1a1a" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+          <span class="auth-brand-name">BLOGGRAPH</span>
+        </a>
+
+        <div class="auth-left-content">
+          <blockquote class="auth-quote">
+            <p>"BlogGraph turned my messy research notes into a polished, ready-to-publish blog post in under two minutes. It's like having a professional editor on demand."</p>
+            <footer class="auth-quote-author">
+              <div class="auth-quote-avatar">S</div>
+              <div>
+                <strong>Sarah K.</strong>
+                <span>Content Strategist at TechFlow</span>
+              </div>
+            </footer>
+          </blockquote>
+        </div>
+
+        <div class="auth-left-badges">
+          <span class="auth-badge">✦ LangGraph</span>
+          <span class="auth-badge">✦ Qwen AI</span>
+          <span class="auth-badge">✦ FastAPI</span>
+        </div>
+      </div>
+
+      <!-- Right panel: form -->
+      <div class="auth-right">
+        <div class="auth-form-wrap">
+          <div class="auth-form-header">
+            <h1 class="auth-title">Welcome back</h1>
+            <p class="auth-subtitle">Sign in to your BlogGraph workspace</p>
+          </div>
+
+          <!-- Social login buttons -->
+          <div class="auth-socials">
+            <button class="auth-social-btn" id="login-google-btn">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+              Continue with Google
+            </button>
+            <button class="auth-social-btn" id="login-github-btn">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+              Continue with GitHub
+            </button>
+          </div>
+
+          <div class="auth-divider"><span>or continue with email</span></div>
+
+          <form class="auth-form" id="login-form" novalidate>
+            <div class="auth-field">
+              <label class="auth-label" for="login-email">Email address</label>
+              <input type="email" id="login-email" class="auth-input" placeholder="you@example.com" autocomplete="email" />
+            </div>
+            <div class="auth-field">
+              <div class="auth-label-row">
+                <label class="auth-label" for="login-password">Password</label>
+                <a href="#" class="auth-link-small">Forgot password?</a>
+              </div>
+              <div class="auth-input-wrap">
+                <input type="password" id="login-password" class="auth-input" placeholder="••••••••" autocomplete="current-password" />
+                <button type="button" class="auth-eye-btn" id="login-eye">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="auth-field auth-checkbox-row">
+              <label class="auth-checkbox-label">
+                <input type="checkbox" id="login-remember" />
+                <span>Remember me for 30 days</span>
+              </label>
+            </div>
+            <button type="submit" class="auth-submit-btn" id="login-submit-btn">
+              <span id="login-btn-text">Sign In</span>
+              <div class="auth-btn-spinner" id="login-spinner" hidden></div>
+            </button>
+          </form>
+
+          <p class="auth-switch-text">
+            Don't have an account?
+            <a href="#signup" class="auth-switch-link" data-nav="signup">Create one free →</a>
+          </p>
+
+          <p class="auth-legal">
+            By signing in, you agree to our
+            <a href="#" class="auth-link-small">Terms of Service</a> and
+            <a href="#" class="auth-link-small">Privacy Policy</a>.
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </div><!-- /page-login -->
+
+
+  <!-- ══════════════════════════════════════════════════
+       PAGE: SIGN UP  (#signup)
+  ══════════════════════════════════════════════════ -->
+  <div id="page-signup" class="page page-auth page-auth-signup" hidden>
+    <div class="auth-layout">
+
+      <!-- Left panel -->
+      <div class="auth-left auth-left-signup">
+        <a class="auth-brand" href="#home" data-nav="home">
+          <svg width="26" height="26" viewBox="0 0 22 22" fill="none">
+            <rect width="22" height="22" rx="5" fill="white"/>
+            <path d="M6 16 L11 6 L16 16" stroke="#1a1a1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M8.5 12.5 H13.5" stroke="#1a1a1a" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+          <span class="auth-brand-name">BLOGGRAPH</span>
+        </a>
+
+        <div class="auth-left-content">
+          <div class="auth-perks">
+            <h2 class="auth-perks-title">Everything you need<br>to write brilliantly</h2>
+            <ul class="auth-perks-list">
+              <li class="auth-perk">
+                <span class="auth-perk-icon">✦</span>
+                <div>
+                  <strong>AI research agent</strong>
+                  <span>Finds sources, facts, and data automatically</span>
+                </div>
+              </li>
+              <li class="auth-perk">
+                <span class="auth-perk-icon">📋</span>
+                <div>
+                  <strong>Smart outlines</strong>
+                  <span>Structured plans generated in seconds</span>
+                </div>
+              </li>
+              <li class="auth-perk">
+                <span class="auth-perk-icon">🖊</span>
+                <div>
+                  <strong>Full draft writing</strong>
+                  <span>Complete sections written with citations</span>
+                </div>
+              </li>
+              <li class="auth-perk">
+                <span class="auth-perk-icon">📁</span>
+                <div>
+                  <strong>Workspace organiser</strong>
+                  <span>Keep all your blog projects in one place</span>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="auth-left-badges">
+          <span class="auth-badge">Free to start</span>
+          <span class="auth-badge">No credit card</span>
+          <span class="auth-badge">Cancel anytime</span>
+        </div>
+      </div>
+
+      <!-- Right panel: form -->
+      <div class="auth-right">
+        <div class="auth-form-wrap">
+          <div class="auth-form-header">
+            <h1 class="auth-title">Create your account</h1>
+            <p class="auth-subtitle">Start writing better blogs with AI — free forever</p>
+          </div>
+
+          <div class="auth-socials">
+            <button class="auth-social-btn" id="signup-google-btn">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+              Sign up with Google
+            </button>
+            <button class="auth-social-btn" id="signup-github-btn">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+              Sign up with GitHub
+            </button>
+          </div>
+
+          <div class="auth-divider"><span>or sign up with email</span></div>
+
+          <form class="auth-form" id="signup-form" novalidate>
+            <div class="auth-field-row">
+              <div class="auth-field">
+                <label class="auth-label" for="signup-fname">First name</label>
+                <input type="text" id="signup-fname" class="auth-input" placeholder="Alex" autocomplete="given-name" />
+              </div>
+              <div class="auth-field">
+                <label class="auth-label" for="signup-lname">Last name</label>
+                <input type="text" id="signup-lname" class="auth-input" placeholder="Johnson" autocomplete="family-name" />
+              </div>
+            </div>
+            <div class="auth-field">
+              <label class="auth-label" for="signup-email">Email address</label>
+              <input type="email" id="signup-email" class="auth-input" placeholder="you@example.com" autocomplete="email" />
+            </div>
+            <div class="auth-field">
+              <label class="auth-label" for="signup-password">Password</label>
+              <div class="auth-input-wrap">
+                <input type="password" id="signup-password" class="auth-input" placeholder="Min. 8 characters" autocomplete="new-password" />
+                <button type="button" class="auth-eye-btn" id="signup-eye">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+              <div class="auth-password-strength" id="signup-strength" hidden>
+                <div class="strength-bars">
+                  <span class="strength-bar" id="sb1"></span>
+                  <span class="strength-bar" id="sb2"></span>
+                  <span class="strength-bar" id="sb3"></span>
+                  <span class="strength-bar" id="sb4"></span>
+                </div>
+                <span class="strength-label" id="strength-label">Weak</span>
+              </div>
+            </div>
+            <div class="auth-field auth-checkbox-row">
+              <label class="auth-checkbox-label">
+                <input type="checkbox" id="signup-terms" />
+                <span>I agree to the <a href="#" class="auth-link-small">Terms of Service</a> and <a href="#" class="auth-link-small">Privacy Policy</a></span>
+              </label>
+            </div>
+            <button type="submit" class="auth-submit-btn auth-submit-btn-signup" id="signup-submit-btn">
+              <span id="signup-btn-text">Create Free Account</span>
+              <div class="auth-btn-spinner" id="signup-spinner" hidden></div>
+            </button>
+          </form>
+
+          <p class="auth-switch-text">
+            Already have an account?
+            <a href="#login" class="auth-switch-link" data-nav="login">Sign in →</a>
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </div><!-- /page-signup -->
+
+
+  <!-- ══════════════════════════════════════════════════
+       PAGE: WORKSPACE APP  (#app)
+  ══════════════════════════════════════════════════ -->
+  <div id="page-app" class="page page-app" hidden>
+
+    <header class="app-topnav" id="app-topnav">
+      <div class="app-nav-inner">
+        <a class="app-nav-brand" href="#home" data-nav="home">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+            <rect width="22" height="22" rx="5" fill="#1a1a1a"/>
+            <path d="M6 16 L11 6 L16 16" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M8.5 12.5 H13.5" stroke="white" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+          <span class="app-brand-name">BLOGGRAPH</span>
+        </a>
+        <nav class="app-nav-links">
+          <a href="#app"  class="app-nav-link app-nav-link-active">Write</a>
+          <a href="#home" class="app-nav-link" data-nav="home">Home</a>
+        </nav>
+        <div class="app-nav-right">
+          <div class="app-mode-badge" id="app-mode-badge">
+            <span class="app-mode-dot" id="app-mode-dot"></span>
+            <span id="app-mode-text">Research Mode: Auto</span>
+          </div>
+          <button type="button" class="app-nav-user-btn" id="logout-btn" title="Log out" aria-label="Log out">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <aside class="app-sidebar" id="app-sidebar" role="complementary">
+        <div class="app-sidebar-brand">
+          <div class="app-sidebar-section-label">Saved Blogs</div>
+          <button class="app-new-blog-btn" id="new-blog-btn" title="New Blog">
+            <svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+            </svg>
+            New Blog
+          </button>
+          <div id="saved-blogs-list">
+            <!-- Saved blogs will be rendered here dynamically -->
+          </div>
+        </div>
+        <hr class="app-sidebar-divider" />
+        <div class="app-sidebar-config">
+          <h2 class="app-sidebar-title">Configure</h2>
+          <p class="app-sidebar-desc">Set up your blog post parameters below.</p>
+          <form id="generate-form" novalidate>
+            <div class="app-form-group">
+              <label class="app-form-label" for="topic-input">Blog Topic <span class="required-star">*</span></label>
+              <textarea id="topic-input" class="app-form-textarea" placeholder="e.g. How LangGraph enables multi-agent workflows in production" rows="3" required></textarea>
+              <p class="app-form-hint">Be specific for better results.</p>
+            </div>
+            <div class="app-form-group">
+              <label class="app-form-label" for="date-input">Reference Date</label>
+              <input type="date" id="date-input" class="app-form-input" />
+            </div>
+            <div class="app-mode-card" id="mode-card" aria-live="polite">
+              <span class="app-mode-indicator-dot" id="mode-dot"></span>
+              <div>
+                <p class="app-mode-card-label">Research Mode</p>
+                <p class="app-mode-card-value" id="mode-value">Determined automatically</p>
+              </div>
+            </div>
+            <button type="submit" class="app-generate-btn" id="generate-btn">
+              <svg class="btn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13a1 1 0 102 0V9.414l1.293 1.293a1 1 0 001.414-1.414z" clip-rule="evenodd"/></svg>
+              <span id="btn-label">Generate Blog</span>
+            </button>
+          </form>
+          <div class="app-stats-row" id="stats-row" hidden>
+            <div class="app-stat-item"><span class="app-stat-num" id="stat-sections">—</span><span class="app-stat-name">Sections</span></div>
+            <div class="app-stat-item"><span class="app-stat-num" id="stat-words">—</span><span class="app-stat-name">Words</span></div>
+          </div>
+        </div>
+      </aside>
+
+      <div class="app-board-area">
+        <div class="app-board-toolbar">
+          <span class="app-board-title">My Blog Project</span>
+          <div class="app-board-toolbar-right">
+            <button class="app-toolbar-btn" id="copy-btn">
+              <svg viewBox="0 0 20 20" fill="currentColor"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>
+              Copy MD
+            </button>
+            <button class="app-toolbar-btn" id="download-btn">
+              <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+              Download
+            </button>
+          </div>
+        </div>
+
+        <div class="app-empty-state" id="empty-state">
+          <div class="app-empty-icon">
+            <svg viewBox="0 0 80 80" fill="none"><rect x="10" y="14" width="60" height="52" rx="5" stroke="#d1d5db" stroke-width="2" fill="white"/><line x1="20" y1="30" x2="60" y2="30" stroke="#e5e7eb" stroke-width="2" stroke-linecap="round"/><line x1="20" y1="40" x2="50" y2="40" stroke="#e5e7eb" stroke-width="2" stroke-linecap="round"/><line x1="20" y1="50" x2="55" y2="50" stroke="#e5e7eb" stroke-width="2" stroke-linecap="round"/><circle cx="60" cy="56" r="12" fill="#1a1a1a"/><path d="M55 56h10M60 51v10" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </div>
+          <h3 class="app-empty-title">Your blog will appear here</h3>
+          <p class="app-empty-desc">Configure your topic in the panel on the left and hit <strong>Generate Blog</strong> to start.</p>
+        </div>
+
+        <div class="app-loading-state" id="loading-state" hidden>
+          <div class="app-loading-inner">
+            <div class="app-loading-ring"></div>
+            <div class="app-loading-steps" id="loading-steps">
+              <div class="app-step active" id="step-routing"><div class="app-step-dot"></div><span>Routing &amp; analysing topic…</span></div>
+              <div class="app-step" id="step-research"><div class="app-step-dot"></div><span>Researching the web…</span></div>
+              <div class="app-step" id="step-planning"><div class="app-step-dot"></div><span>Creating blog outline…</span></div>
+              <div class="app-step" id="step-writing"><div class="app-step-dot"></div><span>Writing all sections…</span></div>
+              <div class="app-step" id="step-images"><div class="app-step-dot"></div><span>Placing images &amp; finishing…</span></div>
+            </div>
+          </div>
+          <p class="app-loading-note">This may take 30–90 seconds. Please wait.</p>
+        </div>
+
+        <div class="app-error-state" id="error-state" hidden role="alert">
+          <svg class="app-error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke-width="2"/><line x1="12" y1="8" x2="12" y2="12" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="16" r="1" fill="currentColor" stroke="none"/></svg>
+          <h3 class="app-error-title">Generation failed</h3>
+          <p class="app-error-message" id="error-message">Something went wrong. Please try again.</p>
+          <button class="app-retry-btn" id="retry-btn">Try Again</button>
+        </div>
+
+        <article class="app-blog-preview" id="blog-preview" hidden>
+          <div class="app-preview-header">
+            <span class="app-preview-badge" id="result-mode-badge-2">open book</span>
+            <span class="app-preview-sections" id="result-sections-text">8 sections</span>
+          </div>
+          <div class="app-blog-content" id="blog-content"></div>
+        </article>
+      </div>
+
+      <aside class="app-chat-panel" id="app-chat-panel">
+        <div class="app-chat-header">
+          <span class="app-chat-dot"></span>
+          <span class="app-chat-name">BlogGraph</span>
+        </div>
+        <div class="app-chat-messages" id="chat-messages">
+          <div class="app-chat-msg">
+            <p class="app-chat-greeting">Hi there!</p>
+            <p class="app-chat-text">You can use the left panel to start creating and organizing your blog posts. Anything you create, we can chat about here.</p>
+            <p class="app-chat-text">Configure a topic and click <strong>Generate Blog</strong> to get started.</p>
+          </div>
+        </div>
+        <div class="app-chat-input-row">
+          <input class="app-chat-input" type="text" id="chat-input" placeholder="Send a message about your blog…" />
+          <button class="app-chat-send" id="chat-send-btn">↑</button>
+        </div>
+      </aside>
+    </main>
+  </div><!-- /page-app -->
+
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+  <script src="/static/app.js?v=3"></script>
+</body>
+</html>

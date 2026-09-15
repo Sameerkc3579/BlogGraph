@@ -1,0 +1,32 @@
+# Render Blueprint — New > Blueprint in the Render dashboard, then pick this repo.
+services:
+  - type: web
+    name: bloggraph
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api:api --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips "*"
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.5"
+      # AI / LLM keys — Render will prompt you to enter values
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: HF_TOKEN
+        sync: false
+      # LangSmith tracing (optional but recommended)
+      - key: LANGCHAIN_TRACING_V2
+        value: "true"
+      - key: LANGCHAIN_ENDPOINT
+        value: "https://api.smith.langchain.com"
+      - key: LANGCHAIN_API_KEY
+        sync: false
+      - key: LANGCHAIN_PROJECT
+        value: "bloggraph-prod"
+      # App settings
+      - key: DAILY_GENERATION_LIMIT
+        value: "5"
+      - key: ENABLE_IMAGES
+        value: "1"
