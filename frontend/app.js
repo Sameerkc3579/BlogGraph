@@ -117,8 +117,9 @@ document.addEventListener('click', (e) => {
     const email = params.get('email') || '';
     const id    = params.get('id') || '';
     if (token) {
-      localStorage.setItem('session_token', token);
+      setToken(token);
       localStorage.setItem('mock_user_id', email.split('@')[0] || 'google_user');
+
       localStorage.setItem('user_name', name);
       localStorage.setItem('user_email', email);
       // Clean up URL and go to app
