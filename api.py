@@ -80,8 +80,10 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
 # ── Request models ──────────────────────────────────────────────
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 IMAGE_NAME_RE = re.compile(r"^[A-Za-z0-9_-]{1,120}\.(?:jpg|png)$")
-GOOGLE_KEY_RE = re.compile(r"^[A-Za-z0-9_\-]{30,100}$")
-HF_TOKEN_RE = re.compile(r"^hf_[A-Za-z0-9]{20,100}$")
+# Loose sanity checks only (printable ASCII, no spaces) — the provider decides validity.
+# Google issues more than one key format (e.g. "AIza…" and newer "AQ.…" keys containing dots).
+GOOGLE_KEY_RE = re.compile(r"^[\x21-\x7E]{20,200}$")
+HF_TOKEN_RE = re.compile(r"^hf_[\x21-\x7E]{10,200}$")
 
 
 def _request_api_keys(x_google_api_key: str | None, x_hf_token: str | None, require_google: bool = True) -> ApiKeys:
