@@ -129,19 +129,55 @@ class State(TypedDict):
 
 
 # -----------------------------
-# 2) LLM
+# 2) LLM — bring your own key
+# Every request supplies the user's own keys through config["configurable"]["api_keys"].
+# Nothing here reads the server's environment keys, so visitors can only spend their own quota.
 # -----------------------------
-hf_token = os.environ.get("HUGGINGFACEHUB_API_TOKEN") or os.environ.get("HF_TOKEN", "")
-
-# Switch to Gemini since HF credits are exhausted
-llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
-    temperature=0.2,
-    max_tokens=2048,
-    timeout=120,
-)
-
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 IMAGE_MODEL = os.environ.get("HF_IMAGE_MODEL", "black-forest-labs/FLUX.1-schnell")
+
+
+class MissingApiKey(RuntimeError):
+    """Raised when a request lacks a key for a provider it needs."""
+
+
+@dataclass(frozen=True)
+class ApiKeys:
+    """Per-request provider keys.
+
+    Passed as an object (not plain strings) because LangChain copies plain string config values
+    into trace metadata (e.g. LangSmith); repr=False keeps the values out of logs too.
+    """
+    google_api_key: str = field(default="", repr=False)
+    hf_token: str = field(default="", repr=False)
+
+
+def _api_keys(config: RunnableConfig | None) -> ApiKeys:
+    keys = ((config or {}).get("configurable") or {}).get("api_keys")
+    return keys if isinstance(keys, ApiKeys) else ApiKeys()
+
+
+def get_llm(config: RunnableConfig | None) -> ChatGoogleGenerativeAI:
+    api_key = _api_keys(config).google_api_key
+    # Must be explicit: with an empty key the client would fall back to the server's GOOGLE_API_KEY
+    if not api_key:
+        raise MissingApiKey("A Google Gemini API key is required to generate blogs.")
+    return ChatGoogleGenerativeAI(
+        model=GEMINI_MODEL,
+        google_api_key=api_key,
+        temperature=0.2,
+        # gemini-2.5-flash spends part of this budget on thinking, so leave headroom
+        max_output_tokens=8192,
+        timeout=120,
+        max_retries=2,
+    )
+
+
+def _message_text(message) -> str:
+    """Plain text of a chat reply (Gemini can return content as a list of parts)."""
+    text = message.text
+    # langchain-core 1.x: `.text` is already a str (calling it is deprecated); older versions: a method
+    return (text if isinstance(text, str) else text()) or ""
 
 
 def _extract_json(text: str) -> str:
@@ -155,7 +191,7 @@ def _extract_json(text: str) -> str:
     return text[start:end + 1]
 
 
-def structured_invoke(schema: type[BaseModel], messages: list, retries: int = 1):
+def structured_invoke(schema: type[BaseModel], messages: list, llm: ChatGoogleGenerativeAI, retries: int = 1):
     """Structured output via prompting + Pydantic validation.
 
     ChatHuggingFace.with_structured_output() rejects Pydantic schemas for function calling,
@@ -171,7 +207,7 @@ def structured_invoke(schema: type[BaseModel], messages: list, retries: int = 1)
 
     last_error: Exception | None = None
     for _ in range(retries + 1):
-        reply = llm.invoke(msgs).content
+        reply = _message_text(llm.invoke(msgs))
         try:
             return schema.model_validate_json(_extract_json(reply))
         except Exception as e:
@@ -199,14 +235,16 @@ If needs_research=true:
 - For open_book weekly roundup, include queries reflecting last 7 days.
 """
 
-def router_node(state: State) -> dict:
+def router_node(state: State, config: RunnableConfig) -> dict:
+    llm = get_llm(config)  # outside the try: a missing key must fail, not silently fall back
     try:
         decision = structured_invoke(
             RouterDecision,
             [
                 SystemMessage(content=ROUTER_SYSTEM),
                 HumanMessage(content=f"Topic: {state['topic']}\nAs-of date: {state['as_of']}"),
-            ]
+            ],
+            llm,
         )
     except Exception:
         # If the router's structured output fails, fall back to writing without research
@@ -272,7 +310,7 @@ Rules:
 - Deduplicate by URL.
 """
 
-def research_node(state: State) -> dict:
+def research_node(state: State, config: RunnableConfig) -> dict:
     queries = (state.get("queries") or [])[:10]
     raw: List[dict] = []
     for q in queries:
@@ -281,6 +319,7 @@ def research_node(state: State) -> dict:
     if not raw:
         return {"evidence": []}
 
+    llm = get_llm(config)
     try:
         pack = structured_invoke(
             EvidencePack,
@@ -293,7 +332,8 @@ def research_node(state: State) -> dict:
                         f"Raw results:\n{raw[:40]}"
                     )
                 ),
-            ]
+            ],
+            llm,
         )
         evidence = pack.evidence
     except Exception:
@@ -335,7 +375,7 @@ Grounding:
 Output must match Plan schema.
 """
 
-def orchestrator_node(state: State) -> dict:
+def orchestrator_node(state: State, config: RunnableConfig) -> dict:
     mode = state.get("mode", "closed_book")
     evidence = state.get("evidence", [])
 
@@ -354,7 +394,8 @@ def orchestrator_node(state: State) -> dict:
                     f"Evidence:\n{[e.model_dump() for e in evidence[:16]]}"
                 )
             ),
-        ]
+        ],
+        get_llm(config),
     )
     if not plan.tasks:
         raise ValueError("Planner returned no sections.")
@@ -414,7 +455,7 @@ Code:
 - If requires_code==true, include at least one minimal snippet.
 """
 
-def worker_node(payload: dict) -> dict:
+def worker_node(payload: dict, config: RunnableConfig) -> dict:
     task = Task(**payload["task"])
     plan = Plan(**payload["plan"])
     evidence = [EvidenceItem(**e) for e in payload.get("evidence", [])]
@@ -425,7 +466,7 @@ def worker_node(payload: dict) -> dict:
         for e in evidence[:20]
     ) or "(none)"
 
-    section_md = llm.invoke(
+    section_md = _message_text(get_llm(config).invoke(
         [
             SystemMessage(content=WORKER_SYSTEM),
             HumanMessage(
@@ -450,7 +491,7 @@ def worker_node(payload: dict) -> dict:
                 )
             ),
         ]
-    ).content.strip()
+    )).strip()
 
     # Guarantee each section starts with its heading so image placement can find it
     if not section_md.startswith("#"):
@@ -484,12 +525,13 @@ Rules:
 Return strictly GlobalImagePlan.
 """
 
-def decide_images(state: State) -> dict:
+def decide_images(state: State, config: RunnableConfig) -> dict:
     merged_md = state["merged_md"]
     plan = state["plan"]
     assert plan is not None
 
-    if not ENABLE_IMAGES:
+    # Images need the user's own Hugging Face token; without one the blog is text-only
+    if not ENABLE_IMAGES or not _api_keys(config).hf_token:
         return {"md_with_placeholders": merged_md, "image_specs": []}
 
     # Only the headings and a short excerpt are sent, so the model never has to echo the whole blog
@@ -510,7 +552,8 @@ def decide_images(state: State) -> dict:
                         f"Blog excerpt:\n{merged_md[:4000]}"
                     )
                 ),
-            ]
+            ],
+            get_llm(config),
         )
         specs = image_plan.images[:3]
     except Exception:
@@ -545,10 +588,13 @@ def _unique_image_filename(name: str) -> str:
     return f"{stem}-{secrets.token_hex(8)}.jpg"
 
 
-def _huggingface_generate_image_bytes(prompt: str) -> bytes:
+def _huggingface_generate_image_bytes(prompt: str, token: str) -> bytes:
     from huggingface_hub import InferenceClient
 
-    client = InferenceClient(token=hf_token or None, timeout=120)
+    # Must be explicit: without a token the client would fall back to the server's HF_TOKEN / cached login
+    if not token:
+        raise MissingApiKey("A Hugging Face token is required to generate images.")
+    client = InferenceClient(token=token, timeout=120)
     image = client.text_to_image(prompt, model=IMAGE_MODEL)
     buf = io.BytesIO()
     # JPEG is ~5-10x smaller than PNG, which matters since images are stored in the database
@@ -556,19 +602,20 @@ def _huggingface_generate_image_bytes(prompt: str) -> bytes:
     return buf.getvalue()
 
 
-def generate_and_place_images(state: State) -> dict:
+def generate_and_place_images(state: State, config: RunnableConfig) -> dict:
     plan = state["plan"]
     assert plan is not None
 
     md = state.get("md_with_placeholders") or state["merged_md"]
     image_specs = state.get("image_specs", []) or []
+    hf_token = _api_keys(config).hf_token
 
     for spec in image_specs:
         placeholder = spec["placeholder"]
         filename = _unique_image_filename(spec["filename"])
         try:
             # Stored in the database (not on disk) so images survive redeploys
-            database.save_image(filename, _huggingface_generate_image_bytes(spec["prompt"]), "image/jpeg")
+            database.save_image(filename, _huggingface_generate_image_bytes(spec["prompt"], hf_token), "image/jpeg")
         except Exception:
             # Leave the image out rather than showing a broken placeholder
             log.exception("Image generation failed for %s", filename)

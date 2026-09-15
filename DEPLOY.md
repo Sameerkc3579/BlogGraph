@@ -22,8 +22,12 @@ Make sure `.env` and `bloggraph.db` are **not** committed (both are in `.gitigno
 
 1. Render dashboard → **New → Blueprint** → select this repository.
 2. Render reads `render.yaml` and asks for the secret values:
-   - `HF_TOKEN` — your Hugging Face token
    - `DATABASE_URL` — the connection string from step 1
+
+   **No AI keys go on the server.** Each user enters their own Google Gemini API key
+   (and optionally a Hugging Face token for images) in the app's Configure panel. Keys are sent
+   only with that user's requests and are never stored. Keep `ALLOW_SERVER_KEYS=0` and don't set
+   `GOOGLE_API_KEY` / `HF_TOKEN` on Render.
 3. Deploy. The health check is `/health`.
 
 Optional settings (Environment tab):

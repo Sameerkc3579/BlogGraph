@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/style.css?v=3" />
+  <link rel="stylesheet" href="/static/style.css?v=4" />
 </head>
 <body>
 
@@ -570,6 +570,28 @@
               <textarea id="topic-input" class="app-form-textarea" placeholder="e.g. How LangGraph enables multi-agent workflows in production" rows="3" required></textarea>
               <p class="app-form-hint">Be specific for better results.</p>
             </div>
+            <div class="app-form-group app-keys" id="api-keys-group">
+              <label class="app-form-label" for="google-key-input">Google Gemini API Key <span class="required-star">*</span></label>
+              <div class="app-key-row">
+                <input type="password" id="google-key-input" class="app-form-input app-key-input" placeholder="AIza…" autocomplete="off" spellcheck="false" />
+                <button type="button" class="app-key-toggle" data-toggle-key="google-key-input" aria-label="Show key">Show</button>
+              </div>
+              <p class="app-form-hint">Writes the blog. Get a free key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio</a>.</p>
+
+              <label class="app-form-label" for="hf-key-input">Hugging Face Token <span class="app-optional">(optional)</span></label>
+              <div class="app-key-row">
+                <input type="password" id="hf-key-input" class="app-form-input app-key-input" placeholder="hf_…" autocomplete="off" spellcheck="false" />
+                <button type="button" class="app-key-toggle" data-toggle-key="hf-key-input" aria-label="Show key">Show</button>
+              </div>
+              <p class="app-form-hint">Only for images. Without it, blogs are text-only. <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener noreferrer">Get a token</a></p>
+
+              <label class="app-key-remember"><input type="checkbox" id="keys-remember" /> Remember keys on this device</label>
+              <div class="app-key-actions">
+                <button type="button" class="app-key-check" id="keys-check-btn">Check keys</button>
+                <span class="app-key-status" id="keys-status" aria-live="polite"></span>
+              </div>
+              <p class="app-form-hint">Your keys are sent only with your own requests and are never saved on our server.</p>
+            </div>
             <div class="app-form-group">
               <label class="app-form-label" for="date-input">Reference Date</label>
               <input type="date" id="date-input" class="app-form-input" />
@@ -668,6 +690,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
-  <script src="/static/app.js?v=4"></script>
+  <script src="/static/app.js?v=5"></script>
 </body>
 </html>

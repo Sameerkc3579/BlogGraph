@@ -351,6 +351,7 @@ async function logout() {
   if (!confirm('Log out of BlogGraph?')) return;
   try { await apiFetch('/auth/logout', { method: 'POST' }); } catch {}
   clearToken();
+  clearApiKeys(); // don't leave keys behind on a shared computer
   const list = document.getElementById('saved-blogs-list');
   if (list) list.innerHTML = '';
   newBlog();
@@ -404,6 +405,96 @@ let currentBlogId = null; // id of the saved blog currently on screen (null for 
 
 /* ── Init date ─────────────────────────────────────────────────── */
 if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+
+/* ── Bring your own API keys ────────────────────────────────────────
+   Keys stay in this browser (sessionStorage, or localStorage when "Remember" is on) and are
+   sent as headers only with your own requests. The server never stores them. */
+const KEY_FIELDS  = { google: 'google-key-input', hf: 'hf-key-input' };
+const KEY_STORAGE = { google: 'bloggraph_google_key', hf: 'bloggraph_hf_key' };
+const KEYS_REMEMBER_FLAG = 'bloggraph_keys_remember';
+const keysRemember = document.getElementById('keys-remember');
+const keysStatus   = document.getElementById('keys-status');
+let serverKeysEnabled = false; // true only when the server allows its own keys (local development)
+
+function keyInput(name) { return document.getElementById(KEY_FIELDS[name]); }
+function getApiKey(name) { return (keyInput(name)?.value || '').trim(); }
+
+function saveApiKeys() {
+  const remember = !!keysRemember?.checked;
+  try {
+    Object.keys(KEY_STORAGE).forEach(name => {
+      localStorage.removeItem(KEY_STORAGE[name]);
+      sessionStorage.removeItem(KEY_STORAGE[name]);
+      const value = getApiKey(name);
+      if (value) (remember ? localStorage : sessionStorage).setItem(KEY_STORAGE[name], value);
+    });
+    remember ? localStorage.setItem(KEYS_REMEMBER_FLAG, '1') : localStorage.removeItem(KEYS_REMEMBER_FLAG);
+  } catch {}
+}
+
+function loadApiKeys() {
+  try {
+    if (keysRemember) keysRemember.checked = localStorage.getItem(KEYS_REMEMBER_FLAG) === '1';
+    Object.keys(KEY_STORAGE).forEach(name => {
+      const value = localStorage.getItem(KEY_STORAGE[name]) || sessionStorage.getItem(KEY_STORAGE[name]) || '';
+      if (keyInput(name)) keyInput(name).value = value;
+    });
+  } catch {}
+}
+
+function clearApiKeys() {
+  try {
+    Object.values(KEY_STORAGE).forEach(k => { localStorage.removeItem(k); sessionStorage.removeItem(k); });
+    localStorage.removeItem(KEYS_REMEMBER_FLAG);
+  } catch {}
+  Object.keys(KEY_FIELDS).forEach(name => { if (keyInput(name)) keyInput(name).value = ''; });
+  if (keysRemember) keysRemember.checked = false;
+  setKeysStatus('');
+}
+
+function apiKeyHeaders() {
+  const headers = {};
+  if (getApiKey('google')) headers['X-Google-Api-Key'] = getApiKey('google');
+  if (getApiKey('hf'))     headers['X-HF-Token']       = getApiKey('hf');
+  return headers;
+}
+
+function setKeysStatus(message, ok) {
+  if (!keysStatus) return;
+  keysStatus.textContent = message;
+  keysStatus.className = 'app-key-status' + (message ? (ok ? ' ok' : ' bad') : '');
+}
+
+Object.values(KEY_FIELDS).forEach(id => document.getElementById(id)?.addEventListener('input', () => {
+  saveApiKeys();
+  setKeysStatus('');
+}));
+keysRemember?.addEventListener('change', saveApiKeys);
+
+document.querySelectorAll('[data-toggle-key]').forEach(btn => btn.addEventListener('click', () => {
+  const input = document.getElementById(btn.dataset.toggleKey);
+  if (!input) return;
+  const show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  btn.textContent = show ? 'Hide' : 'Show';
+  btn.setAttribute('aria-label', show ? 'Hide key' : 'Show key');
+}));
+
+document.getElementById('keys-check-btn')?.addEventListener('click', async () => {
+  if (!getApiKey('google') && !getApiKey('hf')) { setKeysStatus('Enter a key first.', false); return; }
+  setKeysStatus('Checking…', true);
+  try {
+    const res = await apiFetch('/keys/check', { method: 'POST', headers: apiKeyHeaders() });
+    if (!res.ok) throw new Error(await readError(res));
+    const data = await res.json();
+    const results = [data.google, data.hf].filter(Boolean);
+    setKeysStatus(results.map(r => r.message).join(' '), results.every(r => r.ok));
+  } catch (err) {
+    setKeysStatus(err.message || 'Could not check keys.', false);
+  }
+});
+
+loadApiKeys();
 
 /* ── Show/hide states ──────────────────────────────────────────── */
 function showPanel(which) {
@@ -480,6 +571,14 @@ async function handleGenerate(e) {
 
   const as_of = dateInput ? dateInput.value || new Date().toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
 
+  // Generation runs on the user's own Gemini key
+  if (!getApiKey('google') && !serverKeysEnabled) {
+    keyInput('google')?.focus();
+    setKeysStatus('Add your Google Gemini API key to generate.', false);
+    addChatMsg('agent', '🔑 Add your <strong>Google Gemini API key</strong> in the Configure panel first. Blogs are generated with your own key. <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Get a free key</a>');
+    return;
+  }
+
   generateBtn.disabled  = true;
   if (btnLabel) btnLabel.textContent = 'Generating…';
   showPanel('loading');
@@ -489,6 +588,7 @@ async function handleGenerate(e) {
   try {
     const response = await apiFetch('/generate', {
       method: 'POST',
+      headers: apiKeyHeaders(),
       body: JSON.stringify({ topic, as_of }),
     });
 
@@ -788,6 +888,11 @@ function viewSavedBlog(blog) {
 /* ── Validate a stored session on page load (an expired one returns to login) ── */
 if (getToken()) {
   apiFetch('/auth/me')
-    .then(async res => { if (res.ok) setAccountInfo((await res.json()).user); })
+    .then(async res => {
+      if (!res.ok) return;
+      const data = await res.json();
+      setAccountInfo(data.user);
+      serverKeysEnabled = !!data.server_keys_enabled;
+    })
     .catch(() => {});
 }

@@ -36,6 +36,11 @@ if ON_RENDER and not database.IS_POSTGRES:
 
 DAILY_GENERATION_LIMIT = int(os.environ.get("DAILY_GENERATION_LIMIT", "5"))  # 0 = unlimited
 
+# Bring your own key: users must send their own Google (and optionally Hugging Face) keys.
+# ALLOW_SERVER_KEYS=1 lets requests without keys fall back to this server's GOOGLE_API_KEY / HF_TOKEN
+# (handy for local development) — leave it off in production so nobody can spend your quota.
+ALLOW_SERVER_KEYS = os.environ.get("ALLOW_SERVER_KEYS", "0") == "1"
+
 # ── Google OAuth config ─────────────────────────────────────────
 GOOGLE_CLIENT_ID     = os.environ.get("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
@@ -49,7 +54,7 @@ def _google_redirect_uri(request: Request) -> str:
     return f"{base}/auth/google/callback"
 
 # ── import the compiled LangGraph app ──────────────────────────
-from bwa_backend import app as blog_app
+from bwa_backend import ApiKeys, MissingApiKey, app as blog_app
 
 # ── FastAPI setup ───────────────────────────────────────────────
 api = FastAPI(title="BlogGraph API", version="1.1.0")
@@ -75,6 +80,25 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
 # ── Request models ──────────────────────────────────────────────
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 IMAGE_NAME_RE = re.compile(r"^[A-Za-z0-9_-]{1,120}\.(?:jpg|png)$")
+GOOGLE_KEY_RE = re.compile(r"^[A-Za-z0-9_\-]{30,100}$")
+HF_TOKEN_RE = re.compile(r"^hf_[A-Za-z0-9]{20,100}$")
+
+
+def _request_api_keys(x_google_api_key: str | None, x_hf_token: str | None, require_google: bool = True) -> ApiKeys:
+    """Reads the user's own keys from request headers. They are used for this request only and never stored."""
+    google_key = (x_google_api_key or "").strip()
+    hf_token = (x_hf_token or "").strip()
+    if ALLOW_SERVER_KEYS:
+        google_key = google_key or os.environ.get("GOOGLE_API_KEY", "").strip()
+        hf_token = hf_token or (os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACEHUB_API_TOKEN") or "").strip()
+
+    if require_google and not google_key:
+        raise HTTPException(status_code=400, detail="Add your Google Gemini API key in the Configure panel to generate blogs.")
+    if google_key and not GOOGLE_KEY_RE.match(google_key):
+        raise HTTPException(status_code=400, detail="That Google API key doesn't look right. Copy it again from Google AI Studio.")
+    if hf_token and not HF_TOKEN_RE.match(hf_token):
+        raise HTTPException(status_code=400, detail="That Hugging Face token doesn't look right. It should start with hf_.")
+    return ApiKeys(google_api_key=google_key, hf_token=hf_token)
 
 class SignupRequest(BaseModel):
     name: str = Field("", max_length=100)
@@ -140,12 +164,24 @@ _active_lock = threading.Lock()
 def _generation_error(e: Exception) -> tuple[int, str]:
     """Maps agent/provider failures to a status code and a message a user can act on."""
     text = str(e)
+    if isinstance(e, MissingApiKey):
+        return 400, str(e)
+    # Google Gemini (the user's own key)
+    if "API_KEY_INVALID" in text or "API key not valid" in text or "API key expired" in text:
+        return 400, "Google rejected your Gemini API key. Check it in the Configure panel."
+    if "PERMISSION_DENIED" in text:
+        return 400, "Your Google API key isn't allowed to use the Gemini API. Create a key in Google AI Studio."
+    if "RESOURCE_EXHAUSTED" in text or ("429" in text and "quota" in text.lower()):
+        return 429, "Your Gemini API quota is used up for now (free keys have per-minute and per-day limits). Wait a minute and try again."
+    if "NOT_FOUND" in text and "models/" in text:
+        return 500, "The configured Gemini model isn't available (check the GEMINI_MODEL setting)."
+    # Hugging Face (images; the user's own token)
     if "402 Payment Required" in text or "depleted your monthly included credits" in text:
-        return 503, "The AI service has run out of Hugging Face credits. Please try again later."
+        return 402, "Your Hugging Face account has run out of credits."
     if "429 Too Many Requests" in text:
-        return 503, "The AI service is busy (rate limited). Please try again in a few minutes."
-    if "401 Unauthorized" in text and "huggingface" in text.lower():
-        return 503, "The AI service rejected the server's Hugging Face token (check HF_TOKEN)."
+        return 429, "The AI service is rate limiting your key. Please try again in a few minutes."
+    if "401 Unauthorized" in text:
+        return 400, "Your API key was rejected. Check your keys in the Configure panel."
     if "timed out" in text.lower() or "timeout" in type(e).__name__.lower():
         return 504, "The AI service took too long to respond. Please try again."
     return 500, f"Agent error: {text[:300]}"
@@ -295,11 +331,17 @@ def me(user: dict = Depends(current_user)):
         "user": _public_user(user),
         "daily_generation_limit": DAILY_GENERATION_LIMIT,
         "generations_last_24h": database.count_recent_generations(str(user["id"])),
+        "server_keys_enabled": ALLOW_SERVER_KEYS,
     }
 
 
 @api.post("/generate")
-def generate(req: GenerateRequest, user: dict = Depends(current_user)):
+def generate(
+    req: GenerateRequest,
+    user: dict = Depends(current_user),
+    x_google_api_key: str | None = Header(default=None),
+    x_hf_token: str | None = Header(default=None),
+):
     topic = req.topic.strip()
     if not topic:
         raise HTTPException(status_code=400, detail="Topic cannot be empty.")
@@ -307,6 +349,8 @@ def generate(req: GenerateRequest, user: dict = Depends(current_user)):
         date.fromisoformat(req.as_of)
     except ValueError:
         raise HTTPException(status_code=400, detail="as_of must be a date in YYYY-MM-DD format.")
+
+    api_keys = _request_api_keys(x_google_api_key, x_hf_token)
 
     user_key = str(user["id"])
     if DAILY_GENERATION_LIMIT > 0 and database.count_recent_generations(user_key) >= DAILY_GENERATION_LIMIT:
@@ -339,7 +383,12 @@ def generate(req: GenerateRequest, user: dict = Depends(current_user)):
     try:
         # Counted before running so failed attempts (which still spend credits) count too
         database.record_generation(user_key)
-        result = blog_app.invoke(initial_state)
+        result = blog_app.invoke(
+            initial_state,
+            # Keys travel in config (not state) so they're never part of the saved result;
+            # max_concurrency keeps parallel section writers within free-tier rate limits
+            config={"configurable": {"api_keys": api_keys}, "max_concurrency": 4},
+        )
     except Exception as e:
         log.exception("Generation failed for user %s", user_key)
         status, message = _generation_error(e)
@@ -375,6 +424,37 @@ def generate(req: GenerateRequest, user: dict = Depends(current_user)):
         "sections_count": sections_count,
         "blog": blog,
     }
+
+
+@api.post("/keys/check")
+def check_keys(
+    user: dict = Depends(current_user),
+    x_google_api_key: str | None = Header(default=None),
+    x_hf_token: str | None = Header(default=None),
+):
+    """Verifies the user's keys without generating anything (these checks don't use quota)."""
+    keys = _request_api_keys(x_google_api_key, x_hf_token, require_google=False)
+    result = {}
+    if keys.google_api_key:
+        try:
+            r = http_requests.get(
+                "https://generativelanguage.googleapis.com/v1beta/models",
+                headers={"x-goog-api-key": keys.google_api_key},
+                params={"pageSize": 1},
+                timeout=15,
+            )
+            ok = r.ok
+        except http_requests.RequestException:
+            ok = False
+        result["google"] = {"ok": ok, "message": "Google key works." if ok else "Google rejected this key."}
+    if keys.hf_token:
+        try:
+            from huggingface_hub import whoami
+            whoami(token=keys.hf_token)
+            result["hf"] = {"ok": True, "message": "Hugging Face token works."}
+        except Exception:
+            result["hf"] = {"ok": False, "message": "Hugging Face rejected this token."}
+    return result
 
 
 @api.get("/blogs")

@@ -11,11 +11,12 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.13.5"
-      # AI / LLM keys — Render will prompt you to enter values
-      - key: GOOGLE_API_KEY
-        sync: false
-      - key: HF_TOKEN
-        sync: false
+      # No AI keys here: every user brings their own Google Gemini / Hugging Face key in the app.
+      # Keep ALLOW_SERVER_KEYS at 0 so requests can never fall back to a server-side key.
+      - key: ALLOW_SERVER_KEYS
+        value: "0"
+      - key: GEMINI_MODEL
+        value: "gemini-2.5-flash"
       # PostgreSQL URL — REQUIRED on Render (SQLite is wiped on every restart)
       # Create a free PostgreSQL database on render.com and paste its Internal URL here
       - key: DATABASE_URL

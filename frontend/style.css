@@ -1742,6 +1742,67 @@ button.app-nav-user-btn {
 .app-sidebar-ws-menu-danger { color: var(--red, #dc2626); }
 .app-sidebar-ws-menu-danger:hover { background: rgba(239,68,68,.1); }
 
+/* Bring-your-own-key fields */
+.app-keys .app-form-hint + .app-form-label { margin-top: 8px; }
+
+.app-key-row {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.app-key-row .app-key-input {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.app-key-toggle,
+.app-key-check {
+  flex-shrink: 0;
+  padding: 0 10px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--r-sm);
+  background: #fff;
+  color: var(--gray-600);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+
+.app-key-check { padding: 5px 10px; }
+
+.app-key-toggle:hover,
+.app-key-check:hover {
+  background: var(--gray-150);
+  color: var(--black);
+}
+
+.app-optional { font-weight: 400; color: var(--gray-400); }
+
+.app-key-remember {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--gray-600);
+  cursor: pointer;
+}
+
+.app-key-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.app-key-status { font-size: 12px; line-height: 1.35; }
+.app-key-status.ok  { color: #15803d; }
+.app-key-status.bad { color: #b91c1c; }
+
 .app-sidebar-ws-add { color: var(--gray-400); }
 .app-sidebar-ws-add:hover { color: var(--gray-600); }
 
