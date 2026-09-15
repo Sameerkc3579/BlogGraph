@@ -54,7 +54,7 @@ def _google_redirect_uri(request: Request) -> str:
     return f"{base}/auth/google/callback"
 
 # ── import the compiled LangGraph app ──────────────────────────
-from bwa_backend import ApiKeys, MissingApiKey, app as blog_app
+from bwa_backend import GEMINI_MODEL, ApiKeys, MissingApiKey, app as blog_app
 
 # ── FastAPI setup ───────────────────────────────────────────────
 api = FastAPI(title="BlogGraph API", version="1.1.0")
@@ -174,9 +174,12 @@ def _generation_error(e: Exception) -> tuple[int, str]:
     if "PERMISSION_DENIED" in text:
         return 400, "Your Google API key isn't allowed to use the Gemini API. Create a key in Google AI Studio."
     if "RESOURCE_EXHAUSTED" in text or ("429" in text and "quota" in text.lower()):
-        return 429, "Your Gemini API quota is used up for now (free keys have per-minute and per-day limits). Wait a minute and try again."
-    if "NOT_FOUND" in text and "models/" in text:
-        return 500, "The configured Gemini model isn't available (check the GEMINI_MODEL setting)."
+        if "PerDay" in text:
+            return 429, "Your Gemini API key has used its daily free quota. It resets tomorrow, or enable billing in Google AI Studio."
+        return 429, "Your Gemini API key kept hitting Google's per-minute limit. Wait a minute and try again."
+    if "NOT_FOUND" in text and "model" in text.lower():
+        return 500, (f"The Gemini model '{GEMINI_MODEL}' isn't available. Set GEMINI_MODEL to a current model "
+                     "(e.g. gemini-2.5-flash) or remove it in the server's environment settings.")
     # Hugging Face (images; the user's own token)
     if "402 Payment Required" in text or "depleted your monthly included credits" in text:
         return 402, "Your Hugging Face account has run out of credits."
@@ -388,8 +391,8 @@ def generate(
         result = blog_app.invoke(
             initial_state,
             # Keys travel in config (not state) so they're never part of the saved result;
-            # max_concurrency keeps parallel section writers within free-tier rate limits
-            config={"configurable": {"api_keys": api_keys}, "max_concurrency": 4},
+            # low max_concurrency avoids bursting past free-tier per-minute limits (calls are also paced)
+            config={"configurable": {"api_keys": api_keys}, "max_concurrency": 2},
         )
     except Exception as e:
         log.exception("Generation failed for user %s", user_key)

@@ -583,7 +583,7 @@ async function handleGenerate(e) {
   if (btnLabel) btnLabel.textContent = 'Generating…';
   showPanel('loading');
   startLoadingAnimation();
-  addChatMsg('agent', 'Generating your blog post about: <strong>' + escapeHtml(topic) + '</strong>. This may take 30–90 seconds…');
+  addChatMsg('agent', 'Generating your blog post about: <strong>' + escapeHtml(topic) + '</strong>. This usually takes 1–3 minutes (free Gemini keys are rate limited)…');
 
   try {
     const response = await apiFetch('/generate', {

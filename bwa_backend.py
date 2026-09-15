@@ -7,6 +7,10 @@ import os
 import logging
 import re
 import secrets
+import hashlib
+import threading
+import time
+from collections import defaultdict, deque
 from datetime import date, timedelta
 from pathlib import Path
 from typing import TypedDict, List, Optional, Literal, Annotated
@@ -169,7 +173,8 @@ def get_llm(config: RunnableConfig | None) -> ChatGoogleGenerativeAI:
         # gemini-2.5-flash spends part of this budget on thinking, so leave headroom
         max_output_tokens=8192,
         timeout=120,
-        max_retries=2,
+        # call_llm() handles retries: the SDK's immediate retries would burn the per-minute quota
+        max_retries=0,
     )
 
 
@@ -178,6 +183,66 @@ def _message_text(message) -> str:
     text = message.text
     # langchain-core 1.x: `.text` is already a str (calling it is deprecated); older versions: a method
     return (text if isinstance(text, str) else text()) or ""
+
+
+# Free Gemini keys allow only a few requests per minute (5 for gemini-2.5-flash), while one blog
+# needs ~7-11 calls. Calls are paced per key and per-minute 429s are waited out instead of failing.
+GEMINI_RPM = int(os.environ.get("GEMINI_RPM", "5"))  # 0 = no pacing (paid keys)
+LLM_RETRIES = 4
+
+
+class _PerMinuteLimiter:
+    """Blocks until a call fits within `rpm` calls per rolling 60 seconds for that key."""
+
+    def __init__(self):
+        self._calls: dict[str, deque] = defaultdict(deque)
+        self._lock = threading.Lock()
+
+    def wait(self, key_id: str, rpm: int):
+        if rpm <= 0:
+            return
+        while True:
+            with self._lock:
+                calls = self._calls[key_id]
+                now = time.monotonic()
+                while calls and now - calls[0] >= 60:
+                    calls.popleft()
+                if len(calls) < rpm:
+                    calls.append(now)
+                    return
+                delay = 60 - (now - calls[0]) + 0.5
+            time.sleep(delay)
+
+
+_limiter = _PerMinuteLimiter()
+
+
+def _key_id(llm) -> str:
+    """Hash of the key, so the limiter never holds raw keys."""
+    secret = getattr(llm, "google_api_key", None)
+    raw = secret.get_secret_value() if hasattr(secret, "get_secret_value") else str(secret or "")
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def call_llm(llm, messages: list) -> str:
+    """Invokes the model with per-key pacing and retries for per-minute limits and transient errors."""
+    key_id = _key_id(llm)
+    for attempt in range(LLM_RETRIES + 1):
+        _limiter.wait(key_id, GEMINI_RPM)
+        try:
+            return _message_text(llm.invoke(messages))
+        except Exception as e:
+            text = str(e)
+            per_minute_limit = "RESOURCE_EXHAUSTED" in text and "PerDay" not in text
+            transient = any(s in text for s in ("503", "UNAVAILABLE", "500 INTERNAL", "overloaded"))
+            if attempt == LLM_RETRIES or not (per_minute_limit or transient):
+                raise
+            match = re.search(r"retry in ([\d.]+)s", text)
+            delay = min(float(match.group(1)) + 1, 65.0) if (per_minute_limit and match) else (30.0 if per_minute_limit else 5.0)
+            log.warning("Gemini %s; retrying in %.0fs (attempt %d/%d)",
+                        "per-minute limit hit" if per_minute_limit else "temporarily unavailable",
+                        delay, attempt + 1, LLM_RETRIES)
+            time.sleep(delay)
 
 
 def _extract_json(text: str) -> str:
@@ -207,7 +272,7 @@ def structured_invoke(schema: type[BaseModel], messages: list, llm: ChatGoogleGe
 
     last_error: Exception | None = None
     for _ in range(retries + 1):
-        reply = _message_text(llm.invoke(msgs))
+        reply = call_llm(llm, msgs)
         try:
             return schema.model_validate_json(_extract_json(reply))
         except Exception as e:
@@ -466,7 +531,7 @@ def worker_node(payload: dict, config: RunnableConfig) -> dict:
         for e in evidence[:20]
     ) or "(none)"
 
-    section_md = _message_text(get_llm(config).invoke(
+    section_md = call_llm(get_llm(config),
         [
             SystemMessage(content=WORKER_SYSTEM),
             HumanMessage(
@@ -491,7 +556,7 @@ def worker_node(payload: dict, config: RunnableConfig) -> dict:
                 )
             ),
         ]
-    )).strip()
+    ).strip()
 
     # Guarantee each section starts with its heading so image placement can find it
     if not section_md.startswith("#"):
