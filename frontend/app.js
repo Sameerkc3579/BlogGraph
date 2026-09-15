@@ -108,6 +108,26 @@ document.addEventListener('click', (e) => {
 
 /* ─── Boot: set initial route ──────────────────────────────────── */
 (function boot() {
+  // Handle Google OAuth callback: /#google_auth:token=...&email=...&name=...
+  const hash = location.hash;
+  if (hash.startsWith('#google_auth:')) {
+    const params = new URLSearchParams(hash.slice('#google_auth:'.length));
+    const token = params.get('token');
+    const name  = params.get('name') || '';
+    const email = params.get('email') || '';
+    const id    = params.get('id') || '';
+    if (token) {
+      localStorage.setItem('session_token', token);
+      localStorage.setItem('mock_user_id', email.split('@')[0] || 'google_user');
+      localStorage.setItem('user_name', name);
+      localStorage.setItem('user_email', email);
+      // Clean up URL and go to app
+      history.replaceState({ route: 'app' }, '', '#app');
+      navigate('app', false);
+      return;
+    }
+  }
+
   const initial = getRoute();
   // Replace state (not push) so hitting back from home exits the app
   history.replaceState({ route: initial }, titles[initial], `#${initial}`);
@@ -229,9 +249,7 @@ if (loginForm) {
   });
 }
 
-/* Social sign-in and password reset are not available yet */
-['login-google-btn', 'login-github-btn'].forEach(id => document.getElementById(id)?.addEventListener('click', () =>
-  showFormError(loginForm, 'Google and GitHub sign-in are not available yet. Please use your email and password.')));
+/* Password reset is not available yet */
 document.querySelector('#page-login .auth-label-row .auth-link-small')?.addEventListener('click', (e) => {
   e.preventDefault();
   showFormError(loginForm, 'Password reset is not available yet.');
@@ -300,9 +318,6 @@ if (signupForm) {
   });
 }
 
-/* Social sign-up is not available yet */
-['signup-google-btn', 'signup-github-btn'].forEach(id => document.getElementById(id)?.addEventListener('click', () =>
-  showFormError(signupForm, 'Google and GitHub sign-up are not available yet. Please sign up with email.')));
 
 /* ── Auth helpers ─────────────────────────────────────────────── */
 function showFormError(form, message) {
@@ -527,6 +542,10 @@ function addChatMsg(role, html) {
   chatMessages.appendChild(div);
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
+
+/* Social button login — redirect to backend Google OAuth */
+document.getElementById('login-google-btn')?.addEventListener('click', () => { window.location.href = '/auth/google'; });
+document.getElementById('login-github-btn')?.addEventListener('click',  () => { localStorage.setItem('mock_user_id', 'github_user'); navigate('app'); });
 
 document.getElementById('chat-send-btn')?.addEventListener('click', handleChatSend);
 document.getElementById('chat-input')?.addEventListener('keydown', (e) => {
