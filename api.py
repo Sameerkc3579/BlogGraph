@@ -56,7 +56,7 @@ def _google_redirect_uri(request: Request) -> str:
     return f"{base}/auth/google/callback"
 
 # ── import the compiled LangGraph app ──────────────────────────
-from bwa_backend import GEMINI_MODEL, ApiKeys, MissingApiKey, app as blog_app
+from bwa_backend import FALLBACK_GEMINI_MODEL, GEMINI_MODEL, ApiKeys, MissingApiKey, app as blog_app
 
 # ── FastAPI setup ───────────────────────────────────────────────
 api = FastAPI(title="BlogGraph API", version="1.1.0")
@@ -455,21 +455,25 @@ def check_keys(
     if keys.google_api_key:
         # Checks the key against the exact model generation uses (free; no quota spent)
         try:
-            r = http_requests.get(
-                f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}",
-                headers={"x-goog-api-key": keys.google_api_key},
-                timeout=15,
-            )
+            # Same fallback as generation: if the configured model is gone, try the latest alias
+            for checked_model in dict.fromkeys([GEMINI_MODEL, FALLBACK_GEMINI_MODEL]):
+                r = http_requests.get(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/{checked_model}",
+                    headers={"x-goog-api-key": keys.google_api_key},
+                    timeout=15,
+                )
+                if r.status_code != 404:
+                    break
             ok = r.ok
             if ok:
-                message = f"Google key works with {GEMINI_MODEL}."
+                message = f"Google key works with {checked_model}."
             else:
                 try:
                     err = r.json().get("error", {})
                     detail = f"{err.get('status') or r.status_code}: {err.get('message', '')}"
                 except ValueError:
                     detail = f"HTTP {r.status_code}"
-                message = f"Google refused this key for {GEMINI_MODEL} — {_SECRET_RE.sub('[redacted]', detail)[:250]}"
+                message = f"Google refused this key for {checked_model} —{_SECRET_RE.sub('[redacted]', detail)[:250]}"
         except http_requests.RequestException:
             ok, message = False, "Couldn't reach Google to check the key. Please try again."
         result["google"] = {"ok": ok, "message": message}

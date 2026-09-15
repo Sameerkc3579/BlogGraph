@@ -137,7 +137,10 @@ class State(TypedDict):
 # Every request supplies the user's own keys through config["configurable"]["api_keys"].
 # Nothing here reads the server's environment keys, so visitors can only spend their own quota.
 # -----------------------------
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+# "gemini-flash-latest" tracks Google's current Flash model. Pinned versions get retired
+# (e.g. gemini-2.5-flash is no longer available to new API keys).
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest").strip().removeprefix("models/")
+FALLBACK_GEMINI_MODEL = "gemini-flash-latest"
 IMAGE_MODEL = os.environ.get("HF_IMAGE_MODEL", "black-forest-labs/FLUX.1-schnell")
 
 
@@ -166,8 +169,13 @@ def get_llm(config: RunnableConfig | None) -> ChatGoogleGenerativeAI:
     # Must be explicit: with an empty key the client would fall back to the server's GOOGLE_API_KEY
     if not api_key:
         raise MissingApiKey("A Google Gemini API key is required to generate blogs.")
+    # Use the replacement model if GEMINI_MODEL was already found to be retired for this key
+    return _build_llm(api_key, _model_for_key.get(_hash_key(api_key), GEMINI_MODEL))
+
+
+def _build_llm(api_key: str, model: str) -> ChatGoogleGenerativeAI:
     return ChatGoogleGenerativeAI(
-        model=GEMINI_MODEL,
+        model=model,
         google_api_key=api_key,
         temperature=0.2,
         # gemini-2.5-flash spends part of this budget on thinking, so leave headroom
@@ -217,22 +225,53 @@ class _PerMinuteLimiter:
 _limiter = _PerMinuteLimiter()
 
 
-def _key_id(llm) -> str:
-    """Hash of the key, so the limiter never holds raw keys."""
+def _raw_key(llm) -> str:
     secret = getattr(llm, "google_api_key", None)
-    raw = secret.get_secret_value() if hasattr(secret, "get_secret_value") else str(secret or "")
+    return secret.get_secret_value() if hasattr(secret, "get_secret_value") else str(secret or "")
+
+
+def _hash_key(raw: str) -> str:
+    """Hash of a key, so module-level state never holds raw keys."""
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _key_id(llm) -> str:
+    return _hash_key(_raw_key(llm))
+
+
+# key hash -> working model, for keys where GEMINI_MODEL is retired (new keys can't use older models)
+_model_for_key: dict[str, str] = {}
+
+
+def _replacement_model(error_text: str, current: str) -> str | None:
+    """Model to use after a 'model not available' error: Google's suggested model, else the latest alias."""
+    match = re.search(r"use models/([A-Za-z0-9.\-]+)", error_text)
+    for candidate in ([match.group(1)] if match else []) + [FALLBACK_GEMINI_MODEL]:
+        if candidate != current:
+            return candidate
+    return None
 
 
 def call_llm(llm, messages: list) -> str:
     """Invokes the model with per-key pacing and retries for per-minute limits and transient errors."""
     key_id = _key_id(llm)
+    switched_model = False
     for attempt in range(LLM_RETRIES + 1):
         _limiter.wait(key_id, GEMINI_RPM)
         try:
             return _message_text(llm.invoke(messages))
         except Exception as e:
             text = str(e)
+            # Model retired for this key: switch once to Google's suggested model (or the latest alias)
+            if "NOT_FOUND" in text and not switched_model:
+                current_model = str(getattr(llm, "model", "")).removeprefix("models/")
+                replacement = _replacement_model(text, current_model)
+                if replacement:
+                    log.warning("Gemini model %s unavailable for this key; switching to %s", current_model, replacement)
+                    _model_for_key[key_id] = replacement
+                    llm = _build_llm(_raw_key(llm), replacement)
+                    switched_model = True
+                    continue
             per_minute_limit = "RESOURCE_EXHAUSTED" in text and "PerDay" not in text
             transient = any(s in text for s in ("503", "UNAVAILABLE", "500 INTERNAL", "overloaded"))
             if attempt == LLM_RETRIES or not (per_minute_limit or transient):

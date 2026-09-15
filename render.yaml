@@ -16,7 +16,7 @@ services:
       - key: ALLOW_SERVER_KEYS
         value: "0"
       - key: GEMINI_MODEL
-        value: "gemini-2.5-flash"
+        value: "gemini-flash-latest"
       # PostgreSQL URL — REQUIRED on Render (SQLite is wiped on every restart)
       # Create a free PostgreSQL database on render.com and paste its Internal URL here
       - key: DATABASE_URL
