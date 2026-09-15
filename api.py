@@ -165,6 +165,15 @@ def _record_failed_login(*keys: str):
 _active_generations: set[str] = set()
 _active_lock = threading.Lock()
 
+_SECRET_RE = re.compile(r"(AIza[0-9A-Za-z_\-]{20,}|AQ\.[0-9A-Za-z_.\-]{20,}|hf_[0-9A-Za-z]{10,})")
+
+def _provider_message(text: str, limit: int = 300) -> str:
+    """The provider's own human-readable error message (keys redacted), so users see the real cause."""
+    match = re.search(r"""['"]message['"]:\s*['"](.+?)['"]\s*[,}]""", text, flags=re.S)
+    message = match.group(1) if match else text
+    message = _SECRET_RE.sub("[redacted]", message.replace("\\n", " ").strip())
+    return message[:limit]
+
 def _generation_error(e: Exception) -> tuple[int, str]:
     """Maps agent/provider failures to a status code and a message a user can act on."""
     text = str(e)
@@ -179,9 +188,9 @@ def _generation_error(e: Exception) -> tuple[int, str]:
         if "PerDay" in text:
             return 429, "Your Gemini API key has used its daily free quota. It resets tomorrow, or enable billing in Google AI Studio."
         return 429, "Your Gemini API key kept hitting Google's per-minute limit. Wait a minute and try again."
-    if "NOT_FOUND" in text and "model" in text.lower():
-        return 500, (f"The Gemini model '{GEMINI_MODEL}' isn't available. Set GEMINI_MODEL to a current model "
-                     "(e.g. gemini-2.5-flash) or remove it in the server's environment settings.")
+    if "NOT_FOUND" in text:
+        # Show Google's own reason: NOT_FOUND can concern the model, the key's project, or the API version
+        return 502, f"Google returned NOT_FOUND while using model '{GEMINI_MODEL}': {_provider_message(text)}"
     # Hugging Face (images; the user's own token)
     if "402 Payment Required" in text or "depleted your monthly included credits" in text:
         return 402, "Your Hugging Face account has run out of credits."
@@ -191,7 +200,7 @@ def _generation_error(e: Exception) -> tuple[int, str]:
         return 400, "Your API key was rejected. Check your keys in the Configure panel."
     if "timed out" in text.lower() or "timeout" in type(e).__name__.lower():
         return 504, "The AI service took too long to respond. Please try again."
-    return 500, f"Agent error: {text[:300]}"
+    return 500, f"Agent error: {_provider_message(text)}"
 
 
 # ── Endpoints ──────────────────────────────────────────────────
@@ -444,17 +453,26 @@ def check_keys(
     keys = _request_api_keys(x_google_api_key, x_hf_token, require_google=False)
     result = {}
     if keys.google_api_key:
+        # Checks the key against the exact model generation uses (free; no quota spent)
         try:
             r = http_requests.get(
-                "https://generativelanguage.googleapis.com/v1beta/models",
+                f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}",
                 headers={"x-goog-api-key": keys.google_api_key},
-                params={"pageSize": 1},
                 timeout=15,
             )
             ok = r.ok
+            if ok:
+                message = f"Google key works with {GEMINI_MODEL}."
+            else:
+                try:
+                    err = r.json().get("error", {})
+                    detail = f"{err.get('status') or r.status_code}: {err.get('message', '')}"
+                except ValueError:
+                    detail = f"HTTP {r.status_code}"
+                message = f"Google refused this key for {GEMINI_MODEL} — {_SECRET_RE.sub('[redacted]', detail)[:250]}"
         except http_requests.RequestException:
-            ok = False
-        result["google"] = {"ok": ok, "message": "Google key works." if ok else "Google rejected this key."}
+            ok, message = False, "Couldn't reach Google to check the key. Please try again."
+        result["google"] = {"ok": ok, "message": message}
     if keys.hf_token:
         try:
             from huggingface_hub import whoami
