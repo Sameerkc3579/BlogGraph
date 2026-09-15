@@ -496,6 +496,17 @@ document.getElementById('keys-check-btn')?.addEventListener('click', async () =>
 
 loadApiKeys();
 
+/* ── Mobile tabs (only visible on narrow screens) ─────────────── */
+const appMain = document.getElementById('app-main');
+const mobileTabs = document.querySelectorAll('.app-mobile-tab');
+
+function setMobileTab(tab) {
+  if (appMain) appMain.dataset.mobileTab = tab;
+  mobileTabs.forEach(b => b.classList.toggle('active', b.dataset.mobileTab === tab));
+}
+
+mobileTabs.forEach(b => b.addEventListener('click', () => setMobileTab(b.dataset.mobileTab)));
+
 /* ── Show/hide states ──────────────────────────────────────────── */
 function showPanel(which) {
   if (emptyState)   emptyState.hidden   = which !== 'empty';
@@ -573,6 +584,7 @@ async function handleGenerate(e) {
 
   // Generation runs on the user's own Gemini key
   if (!getApiKey('google') && !serverKeysEnabled) {
+    setMobileTab('config');
     keyInput('google')?.focus();
     setKeysStatus('Add your Google Gemini API key to generate.', false);
     addChatMsg('agent', '🔑 Add your <strong>Google Gemini API key</strong> in the Configure panel first. Blogs are generated with your own key. <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Get a free key</a>');
@@ -582,6 +594,7 @@ async function handleGenerate(e) {
   generateBtn.disabled  = true;
   if (btnLabel) btnLabel.textContent = 'Generating…';
   showPanel('loading');
+  setMobileTab('blog');
   startLoadingAnimation();
   addChatMsg('agent', 'Generating your blog post about: <strong>' + escapeHtml(topic) + '</strong>. This usually takes 1–3 minutes (free Gemini keys are rate limited)…');
 
@@ -723,6 +736,7 @@ function newBlog() {
 
   // Show empty state
   showPanel('empty');
+  setMobileTab('config');
 
   // Focus the topic input so the user can type right away
   if (topicInput) topicInput.focus();
@@ -777,6 +791,7 @@ async function loadUserBlogs() {
         a.classList.add('app-sidebar-ws-active');
 
         viewSavedBlog(blog);
+        setMobileTab('blog');
       });
 
       const menuBtn = document.createElement('button');

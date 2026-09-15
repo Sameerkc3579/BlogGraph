@@ -2456,9 +2456,126 @@ button.app-nav-user-btn {
   .feature-item { padding: 0; flex: 0 0 calc(50% - 10px); }
 }
 
+/* Mobile tab bar — hidden on desktop */
+.app-mobile-tabs { display: none; }
+
 @media (max-width: 800px) {
-  .app-sidebar { display: none; }
-  .app-blog-preview { padding: 24px 20px; }
+  :root { --mobile-tabs-h: 60px; }
+
+  /* App: one panel at a time, picked by the bottom tab bar */
+  .app-main {
+    height: calc(100vh - var(--topnav-h) - var(--mobile-tabs-h));
+    height: calc(100dvh - var(--topnav-h) - var(--mobile-tabs-h));
+  }
+
+  .app-sidebar,
+  .app-board-area,
+  .app-chat-panel {
+    display: none;
+    width: 100%;
+    min-width: 0;
+    border: none;
+  }
+
+  .app-main[data-mobile-tab="config"] .app-sidebar    { display: flex; }
+  .app-main[data-mobile-tab="blog"]   .app-board-area { display: flex; }
+  .app-main[data-mobile-tab="chat"]   .app-chat-panel { display: flex; }
+
+  .app-mobile-tabs {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 200;
+    height: var(--mobile-tabs-h);
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--white);
+    border-top: 1px solid var(--gray-200);
+  }
+
+  .app-mobile-tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    background: none;
+    border: none;
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--gray-400);
+    cursor: pointer;
+  }
+
+  .app-mobile-tab svg { width: 20px; height: 20px; }
+  .app-mobile-tab.active { color: var(--black); font-weight: 600; }
+
+  .app-nav-inner { padding: 0 14px; gap: 12px; }
+  .app-nav-links { display: none; }
+  .app-mode-badge { padding: 4px 10px; font-size: 11px; }
+
+  .app-sidebar-brand,
+  .app-sidebar-config { padding-left: 16px; padding-right: 16px; }
+
+  /* 16px inputs stop iOS Safari from zooming in on focus */
+  .app-form-textarea,
+  .app-form-input,
+  .app-key-row .app-key-input,
+  .app-chat-input,
+  .auth-input { font-size: 16px; }
+
+  .app-key-toggle { padding: 0 14px; }
+
+  .app-board-toolbar { padding: 8px 14px; gap: 8px; }
+  .app-blog-preview { padding: 20px 16px 32px; }
+  .app-blog-content { font-size: 16px; }
+  .app-blog-content h2 { font-size: 19px; margin-top: 32px; }
+  .app-blog-content pre { padding: 14px 16px; }
+  .app-blog-content table { display: block; overflow-x: auto; }
+  .app-loading-steps { align-self: stretch; max-width: 280px; margin: 0 auto; }
+
+  /* Landing */
+  .landing-nav-inner { padding: 0 16px; }
+  .nav-btn-ghost { padding: 6px 10px; }
+  .nav-btn-outline { padding: 6px 12px; }
+
+  .hero-headline { letter-spacing: -1px; }
+
+  .features-strip { padding: 24px 16px; }
+
+  .demo-section { padding: 24px 12px 32px; }
+  .demo-window { border-radius: var(--r-lg); }
+  .demo-toolbar-actions,
+  .demo-sidebar,
+  .demo-chat-panel { display: none; }
+  .demo-body { height: 420px; }
+  .demo-column { width: 240px; min-width: 240px; }
+
+  .landing-cta-section { padding: 56px 20px; }
+  .landing-footer { padding: 24px 16px; }
+  .landing-footer-inner { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .landing-footer-copy:last-child { margin-left: 0; }
+
+  /* Auth */
+  .auth-right { padding: 32px 16px; align-items: flex-start; }
+}
+
+@media (max-width: 520px) {
+  .feature-item { flex: 0 0 100%; }
+  .hero-subtext { font-size: 14px; }
+  .hero-cta-btn { padding: 12px 26px; }
+  .auth-field-row { flex-direction: column; gap: 16px; }
+  .auth-title { font-size: 23px; }
+  .app-board-title { display: none; }
+  .app-board-toolbar { justify-content: flex-end; }
+}
+
+/* Touch screens have no hover, so keep the saved-blog "⋯" button visible */
+@media (hover: none) {
+  .app-sidebar-ws-menu-btn { opacity: 1; }
 }
 
 /* ── Landing CTA Section ────────────────────────────────────── */
