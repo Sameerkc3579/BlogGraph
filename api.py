@@ -3,9 +3,12 @@ import os
 import re
 import threading
 import time
+import urllib.parse
 from collections import defaultdict, deque
 from datetime import date
 from pathlib import Path
+
+import requests as http_requests
 
 from dotenv import load_dotenv
 
@@ -32,6 +35,18 @@ if ON_RENDER and not database.IS_POSTGRES:
     )
 
 DAILY_GENERATION_LIMIT = int(os.environ.get("DAILY_GENERATION_LIMIT", "5"))  # 0 = unlimited
+
+# ── Google OAuth config ─────────────────────────────────────────
+GOOGLE_CLIENT_ID     = os.environ.get("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+# Dynamically built so it works both locally and on Render
+def _google_redirect_uri(request: Request) -> str:
+    base = os.environ.get("APP_BASE_URL", "").rstrip("/")
+    if not base:
+        scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+        host   = request.headers.get("x-forwarded-host", request.url.netloc)
+        base   = f"{scheme}://{host}"
+    return f"{base}/auth/google/callback"
 
 # ── import the compiled LangGraph app ──────────────────────────
 from bwa_backend import app as blog_app
@@ -181,6 +196,97 @@ def logout(authorization: str | None = Header(default=None)):
     if token:
         database.delete_session(auth.hash_token(token))
     return {"status": "success"}
+
+
+# ── Google OAuth endpoints ──────────────────────────────────────
+@api.get("/auth/google")
+def google_login(request: Request):
+    """Redirect the browser to Google's OAuth consent screen."""
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=501, detail="Google login is not configured on this server.")
+    params = {
+        "client_id":     GOOGLE_CLIENT_ID,
+        "redirect_uri":  _google_redirect_uri(request),
+        "response_type": "code",
+        "scope":         "openid email profile",
+        "access_type":   "online",
+        "prompt":        "select_account",
+    }
+    url = "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(params)
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url)
+
+
+@api.get("/auth/google/callback")
+def google_callback(code: str | None = None, error: str | None = None, request: Request = None):
+    """Google redirects here with ?code=... after the user approves."""
+    if error or not code:
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse("/#login?error=google_denied")
+
+    # 1. Exchange auth code for tokens
+    token_resp = http_requests.post(
+        "https://oauth2.googleapis.com/token",
+        data={
+            "code":          code,
+            "client_id":     GOOGLE_CLIENT_ID,
+            "client_secret": GOOGLE_CLIENT_SECRET,
+            "redirect_uri":  _google_redirect_uri(request),
+            "grant_type":    "authorization_code",
+        },
+        timeout=10,
+    )
+    if not token_resp.ok:
+        log.error("Google token exchange failed: %s", token_resp.text)
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse("/#login?error=google_token")
+
+    access_token = token_resp.json().get("access_token")
+
+    # 2. Fetch the user's profile from Google
+    profile_resp = http_requests.get(
+        "https://www.googleapis.com/oauth2/v2/userinfo",
+        headers={"Authorization": f"Bearer {access_token}"},
+        timeout=10,
+    )
+    if not profile_resp.ok:
+        log.error("Google userinfo failed: %s", profile_resp.text)
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse("/#login?error=google_profile")
+
+    profile  = profile_resp.json()
+    email    = (profile.get("email") or "").strip().lower()
+    name     = profile.get("name") or email.split("@")[0]
+
+    if not email:
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse("/#login?error=google_no_email")
+
+    # 3. Find or create the user (Google accounts have no password)
+    user = database.get_user_by_email(email)
+    if user is None:
+        user = database.create_user(email, name, password_hash="")
+        if user is None:          # race condition: just created by another request
+            user = database.get_user_by_email(email)
+        log.info("New Google account: user %s", user["id"] if user else "?")
+
+    if not user:
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse("/#login?error=google_db")
+
+    # 4. Issue a session and redirect to the app with the token in the URL fragment
+    session = _start_session(user, days=30)
+    token   = session["token"]
+    u       = session["user"]
+    # Pass token + basic user info via URL fragment so the frontend can store it
+    fragment = urllib.parse.urlencode({
+        "token": token,
+        "id":    u["id"],
+        "email": u["email"],
+        "name":  u["name"],
+    })
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(f"/#google_auth:{fragment}")
 
 
 @api.get("/auth/me")
