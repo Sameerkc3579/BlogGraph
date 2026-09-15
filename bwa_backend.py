@@ -18,7 +18,7 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.types import Send
 
 from langchain_core.messages import AIMessage, SystemMessage, HumanMessage
-from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 import database
 
@@ -130,13 +130,13 @@ class State(TypedDict):
 # -----------------------------
 hf_token = os.environ.get("HUGGINGFACEHUB_API_TOKEN") or os.environ.get("HF_TOKEN", "")
 
-hf_llm = HuggingFaceEndpoint(
-    repo_id="Qwen/Qwen2.5-72B-Instruct",
-    huggingfacehub_api_token=hf_token,
-    max_new_tokens=2048,
+# Switch to Gemini since HF credits are exhausted
+llm = ChatGoogleGenerativeAI(
+    model="gemini-1.5-flash",
+    temperature=0.2,
+    max_tokens=2048,
     timeout=120,
 )
-llm = ChatHuggingFace(llm=hf_llm)
 
 IMAGE_MODEL = os.environ.get("HF_IMAGE_MODEL", "black-forest-labs/FLUX.1-schnell")
 
