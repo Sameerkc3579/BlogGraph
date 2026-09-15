@@ -197,6 +197,8 @@ def _message_text(message) -> str:
 # needs ~7-11 calls. Calls are paced per key and per-minute 429s are waited out instead of failing.
 GEMINI_RPM = int(os.environ.get("GEMINI_RPM", "5"))  # 0 = no pacing (paid keys)
 LLM_RETRIES = 4
+# Used for a call when its model is overloaded ("high demand" spikes hit one model at a time)
+OVERLOAD_FALLBACK_MODELS = ["gemini-flash-lite-latest", "gemini-flash-latest"]
 
 
 class _PerMinuteLimiter:
@@ -256,6 +258,7 @@ def call_llm(llm, messages: list) -> str:
     """Invokes the model with per-key pacing and retries for per-minute limits and transient errors."""
     key_id = _key_id(llm)
     switched_model = False
+    overload_switched = False
     for attempt in range(LLM_RETRIES + 1):
         _limiter.wait(key_id, GEMINI_RPM)
         try:
@@ -273,11 +276,23 @@ def call_llm(llm, messages: list) -> str:
                     switched_model = True
                     continue
             per_minute_limit = "RESOURCE_EXHAUSTED" in text and "PerDay" not in text
-            transient = any(s in text for s in ("503", "UNAVAILABLE", "500 INTERNAL", "overloaded"))
+            transient = any(s in text for s in ("503", "UNAVAILABLE", "500 INTERNAL", "overloaded", "high demand"))
             if attempt == LLM_RETRIES or not (per_minute_limit or transient):
                 raise
+            # Still overloaded after a retry: move this call to another Flash model (not remembered)
+            if transient and attempt >= 1 and not overload_switched:
+                current_model = str(getattr(llm, "model", "")).removeprefix("models/")
+                alternate = next((m for m in OVERLOAD_FALLBACK_MODELS if m != current_model), None)
+                if alternate:
+                    log.warning("Gemini model %s overloaded; switching this call to %s", current_model, alternate)
+                    llm = _build_llm(_raw_key(llm), alternate)
+                    overload_switched = True
+                    continue
             match = re.search(r"retry in ([\d.]+)s", text)
-            delay = min(float(match.group(1)) + 1, 65.0) if (per_minute_limit and match) else (30.0 if per_minute_limit else 5.0)
+            if per_minute_limit:
+                delay = min(float(match.group(1)) + 1, 65.0) if match else 30.0
+            else:
+                delay = min(5.0 * 2 ** attempt, 40.0)  # 5s, 10s, 20s, 40s
             log.warning("Gemini %s; retrying in %.0fs (attempt %d/%d)",
                         "per-minute limit hit" if per_minute_limit else "temporarily unavailable",
                         delay, attempt + 1, LLM_RETRIES)

@@ -199,6 +199,8 @@ def _generation_error(e: Exception) -> tuple[int, str]:
         return 429, "The AI service is rate limiting your key. Please try again in a few minutes."
     if "401 Unauthorized" in text:
         return 400, "Your API key was rejected. Check your keys in the Configure panel."
+    if "high demand" in text or "UNAVAILABLE" in text or "overloaded" in text.lower():
+        return 503, "Google's Gemini servers are overloaded right now (high demand). This is temporary, so please try again in a few minutes."
     if "timed out" in text.lower() or "timeout" in type(e).__name__.lower():
         return 504, "The AI service took too long to respond. Please try again."
     return 500, f"Agent error: {_provider_message(text)}"
