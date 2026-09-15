@@ -34,7 +34,7 @@ Optional settings (Environment tab):
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `DAILY_GENERATION_LIMIT` | `5` | Blogs per user per 24 h (`0` = unlimited) |
+| `DAILY_GENERATION_LIMIT` | `0` | Successful blogs per user per 24 h (`0` = unlimited) |
 | `ENABLE_IMAGES` | `1` | `0` skips images to save Hugging Face credits |
 | `HF_IMAGE_MODEL` | `black-forest-labs/FLUX.1-schnell` | Image model |
 | `ALLOWED_ORIGINS` | *(none)* | Only needed if another site calls the API |

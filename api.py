@@ -34,7 +34,9 @@ if ON_RENDER and not database.IS_POSTGRES:
         "DATABASE_URL is required to keep accounts and blogs. Add it under Environment in the Render dashboard."
     )
 
-DAILY_GENERATION_LIMIT = int(os.environ.get("DAILY_GENERATION_LIMIT", "5"))  # 0 = unlimited
+# Successful blogs per account per 24 hours. Off by default: with bring-your-own-key each user
+# spends their own Gemini quota, which Google already limits. 0 = unlimited.
+DAILY_GENERATION_LIMIT = int(os.environ.get("DAILY_GENERATION_LIMIT", "0"))
 
 # Bring your own key: users must send their own Google (and optionally Hugging Face) keys.
 # ALLOW_SERVER_KEYS=1 lets requests without keys fall back to this server's GOOGLE_API_KEY / HF_TOKEN
@@ -386,8 +388,6 @@ def generate(
     }
 
     try:
-        # Counted before running so failed attempts (which still spend credits) count too
-        database.record_generation(user_key)
         result = blog_app.invoke(
             initial_state,
             # Keys travel in config (not state) so they're never part of the saved result;
@@ -421,6 +421,9 @@ def generate(
         mode=mode,
         sections_count=sections_count,
     )
+
+    # Only successful blogs count toward the daily limit (failures often come from the user's key/quota)
+    database.record_generation(user_key)
 
     return {
         "markdown": markdown,

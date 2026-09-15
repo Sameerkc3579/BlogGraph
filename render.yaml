@@ -31,7 +31,8 @@ services:
       - key: LANGCHAIN_PROJECT
         value: "bloggraph-prod"
       # App settings
+      # Successful blogs per account per 24 h (0 = unlimited; users spend their own Gemini quota)
       - key: DAILY_GENERATION_LIMIT
-        value: "5"
+        value: "0"
       - key: ENABLE_IMAGES
         value: "1"
