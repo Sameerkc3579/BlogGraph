@@ -16,6 +16,10 @@ services:
         sync: false
       - key: HF_TOKEN
         sync: false
+      # PostgreSQL URL — REQUIRED on Render (SQLite is wiped on every restart)
+      # Create a free PostgreSQL database on render.com and paste its Internal URL here
+      - key: DATABASE_URL
+        sync: false
       # LangSmith tracing (optional but recommended)
       - key: LANGCHAIN_TRACING_V2
         value: "true"
